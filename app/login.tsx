@@ -1,7 +1,9 @@
+import { BotaoCustomizado } from '@/src/components/BotaoCustomizado';
+import { InputCustomizado } from '@/src/components/InputCustomizado';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Colors } from "../constants/colors";
 
 export default function Login() {
@@ -61,35 +63,11 @@ export default function Login() {
 
               }}>
                  <Text style={styles.textInput}>Email</Text>
-                 <TextInput 
-                  style={styles.inputPadrao} 
-                  placeholder="Digite seu email" // Texto que desaparece quando vai escrever.
-                  value={email} // Lê o que está na memória
-                  onChangeText={setEmail} // Atualiza a memória a cada letra digitada
-                 />
+                 <InputCustomizado placeholder='Digite seu email' valor={email} aoMudarTexto={setEmail}/>
                  <Text style={styles.textInput}>Senha</Text>
-                 <TextInput 
-                  style={styles.inputPadrao} 
-                  placeholder="Digite sua senha"
-                  value={senha}
-                  onChangeText={setSenha}
-                  secureTextEntry={true}
-                 />
-                 <TouchableOpacity style={{
-                  backgroundColor: Colors.secondary,
-                  height: 55, // Definir o tamanho vertical(altura) de um componente, pode ser fixa ou proporcional.
-                  borderRadius: 30,
-                  marginTop: 20,
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                 }} 
-                  onPress={fazerLogin}>
-                  <Text style={{
-                    color: 'white',
-                    fontWeight: 'bold',
-                    fontSize: 18,
-                  }}>Entrar</Text>
-                 </TouchableOpacity>
+                 <InputCustomizado placeholder='Digite sua senha' valor={senha} aoMudarTexto={setSenha} seguro={true} />
+                 <BotaoCustomizado text='Entrar' aoClicar={fazerLogin}/>
+                 
               </View>
           </View>
           <View style={{
@@ -146,16 +124,6 @@ export default function Login() {
 }
 
 const styles = StyleSheet.create({
-    inputPadrao:{
-      backgroundColor: 'white',
-      height: 50,
-      borderWidth: 1, // Definir a espessura da borda ao redor de um componente.
-      borderRadius: 15,
-      borderColor: Colors.border, // Definir a cor da borda de um componente.
-      elevation: 2,
-      paddingHorizontal: 15,
-      marginBottom: 15
-    },
 
     textInput:{
       color: Colors.text,

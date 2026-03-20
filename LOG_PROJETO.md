@@ -17,7 +17,9 @@
 ### 3. Front-end: Construção da Tela de Login (`login.tsx`)
 * **Layout Responsivo:** Implementação do Flexbox e Box Model para estruturação de camadas (Header Laranja, Card de Formulário Branco, Rodapé).
 * **Neumorfismo:** Aplicação de bordas arredondadas e sombras (`elevation`) nos campos de texto para dar profundidade ao design.
-* **Componentização UI:** * Campos de `<TextInput>` customizados para Email e Senha (com `secureTextEntry`).
+* **Refatoração e Clean Code (Componentização UI):** 
+  * Criação de componentes reutilizáveis e escaláveis (`InputCustomizado` e `BotaoCustomizado`).
+  * Implementação de contratos rígidos usando `Interfaces` do TypeScript (Props) para garantir a tipagem correta de dados e funções passadas entre as telas.
   * Botão de login principal e links de navegação.
   * Divisor flexível ("--- or ---") criado com Views dinâmicas.
   * Integração da biblioteca `@expo/vector-icons` (FontAwesome) para os botões sociais (Google e Facebook).
@@ -34,7 +36,7 @@
 
 ### O que falta no Front-end:
 * **Splash Screen (`index.tsx`):** Substituir o texto temporário "Sistema iniciando" pela logomarca oficial da UNINASSAU/Projeto e refinar a animação de transição para a tela de Login.
-* **Tela de Cadastro (`cadastro.tsx`):** Desenvolver a interface de formulário de cadastro seguindo o mesmo Design System (Neumorfismo) do Login.
+* **Tela de Cadastro (`cadastro.tsx`):** Desenvolver a interface de formulário de cadastro seguindo o mesmo Design System (Neumorfismo) do Login reaproveitando os componentes recém-criados (`InputCustomizado` e `BotaoCustomizado`).
 
 ### Próximos Passos (Back-end e Integração):
 * **Função Fetch:** Substituir o `console.log` atual do formulário de Login por uma requisição HTTP (`fetch`) real.
