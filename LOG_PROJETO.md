@@ -5,7 +5,7 @@
 **Status:** Concluído ✅
 
 ### 1. Infraestrutura e Configuração Inicial
-* **Backend:** Repositório inicializado (Spring Boot) e conectado ao banco de dados Supabase via variáveis de ambiente. Teste de persistência validado.
+* **Backend:** Repositório inicializado (Spring Boot) e conectado ao banco de dados Supabase via variáveis de ambiente. Teste de persistência validado. API REST construída e testada com sucesso (Rotas de Cadastro e Login funcionais).
 * **Frontend:** Projeto React Native (Expo) criado com suporte a TypeScript. Limpeza do template padrão (`reset-project`) executada.
 * **Ambiente:** Configuração de permissões de script no Windows (PowerShell) para execução do `npx`.
 * **Arquitetura de Pastas:** Estruturação criada (`src/services`, `src/components`, e `src/assets`) para separar a lógica de negócios da interface.
@@ -34,10 +34,13 @@
 
 ## 🚧 Sprint 2: Telas Pendentes e Integração (Em Andamento)
 
+### O que já foi feito na Sprint 2:
+* **Tela de Cadastro (`cadastro.tsx`):** Formulário base construído reaproveitando os componentes (`InputCustomizado` e `BotaoCustomizado`). Implementada a lógica de botões de seleção ("Aluno" e "Professor") lado a lado utilizando Flexbox (`flex: 1`). Estado inicial do Modal (`Bottom Sheet`) preparado para exibir as opções específicas de cada perfil.
+
 ### O que falta no Front-end:
 * **Splash Screen (`index.tsx`):** Substituir o texto temporário "Sistema iniciando" pela logomarca oficial da UNINASSAU/Projeto e refinar a animação de transição para a tela de Login.
-* **Tela de Cadastro (`cadastro.tsx`):** Desenvolver a interface de formulário de cadastro seguindo o mesmo Design System (Neumorfismo) do Login reaproveitando os componentes recém-criados (`InputCustomizado` e `BotaoCustomizado`).
+* **Refinamento do Cadastro:** Aplicar os estilos visuais de "Gaveta" (Bottom Sheet) no Modal de seleção de perfil e adicionar os campos específicos para Aluno (Interesses) e Professor (Matérias).ial do Modal (`Bottom Sheet`) preparado para exibir as opções específicas de cada perfil.
 
 ### Próximos Passos (Back-end e Integração):
 * **Função Fetch:** Substituir o `console.log` atual do formulário de Login por uma requisição HTTP (`fetch`) real.
-* **Desenvolvimento da API:** Criar os endpoints no servidor (Python/Spring Boot) para receber o JSON do aplicativo, validar as credenciais no banco de dados e retornar a resposta (Sucesso/Erro).
+* **Desenvolvimento da API (Concluído ✅):** Os endpoints no servidor (Spring Boot) já foram criados para receber o JSON do aplicativo, validar as credenciais no banco de dados e retornar a resposta (Sucesso/Erro). Resta apenas a conexão de rede (IP) entre o Front e o Back.
