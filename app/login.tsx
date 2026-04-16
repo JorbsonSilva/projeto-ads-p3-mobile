@@ -26,7 +26,8 @@ export default function Login() {
           textAlignVertical: 'top', // Definir o alinhamento vertical do texto dentro de um componente.
           alignSelf: "flex-start", // Ele substitui o alinhamento definido pelo alignItems do pai apenas para esse componente.
           marginBottom: 15, // Definir um espaço externo na parte inferior de um componente, separando-o do elemento seguinte.
-          marginLeft: '5%' // Definir um espaço externo na borda esquerda de um componente, separando-o do elemento seguinte.
+          marginLeft: '5%', // Definir um espaço externo na borda esquerda de um componente, separando-o do elemento seguinte.
+          paddingTop: 20
           }}>Login</Text>
           
           <View style={{
@@ -78,7 +79,7 @@ export default function Login() {
                <View style={{
                   flexDirection: 'row', // Definir o eixo principal do contêiner, determinando se os elementos filhos (componentes) serão organizados horizontalmente (linha) ou verticalmente (coluna).
                   alignItems: 'center',
-                  width: '80%'
+                  width: '90%'
                 }}>
                    <View style={{
                       flex: 1,
