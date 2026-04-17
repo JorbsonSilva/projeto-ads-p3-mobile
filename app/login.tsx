@@ -20,7 +20,7 @@ export default function Login() {
 
   // Função que será chamada quando apertar o botão Entrar (Mock do Back-end)
   const executarLogin = () => {
-    console.log("Integração Orienta -> Email:", email, "Senha:", senha, "Perfil:", perfil);
+    roteador.replace('/(tabs)');
   }; 
 
   return (
