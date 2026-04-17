@@ -35,6 +35,8 @@
 ## 🚧 Sprint 2: Telas Pendentes e Integração (Em Andamento)
 
 ### O que já foi feito na Sprint 2:
+🟢 [ATUALIZADO] * **Identidade Visual:** Aplicativo oficialmente nomeado como "Orienta".
+🟢 [ATUALIZADO] * **Splash Screen (`index.tsx`):** Implementada a tela de abertura com a logomarca oficial em PNG. Criada animação fluida de surgimento (Fade In) e crescimento (Spring) utilizando a API nativa `Animated`. Transição automática para a tela de Login configurada.
 * **Tela de Cadastro (`cadastro.tsx`):** Formulário base construído reaproveitando os componentes (`InputCustomizado` e `BotaoCustomizado`). Implementada a lógica de botões de seleção ("Aluno" e "Professor") lado a lado utilizando Flexbox (`flex: 1`). Estado inicial do Modal (`Bottom Sheet`) preparado para exibir as opções específicas de cada perfil.
 
 ### O que falta no Front-end:

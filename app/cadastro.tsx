@@ -4,124 +4,154 @@ import { InputCustomizado } from '@/src/components/InputCustomizado';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context'; // View inteligente
 
-export default async function Cadastro() {
+export default function Cadastro() { 
 
-  const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [senha, setSenha] = useState('');
-  const [confirmaSenha, setConfirmaSenha] = useState('');
-  const [data, setData] = useState('');
-  const [nome, setNome] = useState('');
+  const roteador = useRouter();
+  
+  // Espaços de memória para os inputs
+  const [email, definirEmail] = useState('');
+  const [senha, definirSenha] = useState('');
+  const [confirmaSenha, definirConfirmaSenha] = useState('');
+  const [data, definirData] = useState('');
+  const [nome, definirNome] = useState('');
 
   const validarEEnviar = async () => {
+    
+    // Cláusulas de Guarda: Barrando erros antes de chamar o servidor
     if(!nome || !data || !email || !senha || !confirmaSenha){
       Alert.alert("Atenção!!!!", "Por favor, preencha todos os campos.");
-      return ;
+      return; // Expulsa o código da função
     }
     if (senha !== confirmaSenha){
-      Alert.alert("As senhas não coincidem. Tente novamente.");
-      return ;
+      Alert.alert("Erro", "As senhas não coincidem. Tente novamente.");
+      return;
     }
-    if (senha.length < 8){
-      Alert.alert("A senha deve ter pelo menos 6 caracteres.");
-      return ; 
+    if (senha.length < 6){ 
+      Alert.alert("Senha Fraca", "A senha deve ter pelo menos 6 caracteres.");
+      return; 
     }
-  };
 
-  const pacoteJSON = {
-    nome: nome,
-    email: email,
-    senha: senha
-  };
+    // Pacote JSON
+    const pacoteJSON = {
+      nome: nome,
+      email: email,
+      senha: senha
+    };
 
-  try {
-    const resposta = await fetch("http://127.0.0.1:8080/api/usuarios/cadastro",{
-      method: 'POST',
-      headers: {
-        'Content-Type': 'applicantion/json'
-      },
-      body: JSON.stringify(pacoteJSON)
-    });
-    if (resposta.ok) {
-      Alert.alert("Conta criada com sucesso.")
-    } else {
-      Alert.alert("Erro, Não foi possível criar a conta. Verifique os dados.")
+    try {
+      //  IMPORTANTE: Troque o SEU_IP_AQUI pelo seu IP da rede Wi-Fi (ex: 192.168.1.10)
+      const resposta = await fetch("http://SEU_IP_AQUI:8080/api/usuarios/cadastro", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json' // 🟢 Corrigido o erro de digitação
+        },
+        body: JSON.stringify(pacoteJSON)
+      });
+
+      if (resposta.ok) {
+        Alert.alert("Sucesso", "Conta criada com sucesso!");
+        roteador.push('/login'); // Manda o usuário pro login automaticamente após criar a conta
+      } else {
+        Alert.alert("Erro", "Não foi possível criar a conta. Verifique os dados.");
+      }
+    } catch (error) {
+        Alert.alert("Erro de conexão", "Não conseguimos alcançar o servidor.");
+        console.error("Erro no fetch: ", error);
     }
-  } catch (error){
-      Alert.alert("Erro de conexão, Verifique sua internet.")
-      console.error(error);
   };
 
   return (
-    <View style={style.container1}>
-      <Text style={style.textTitulo}>Cadastro</Text>
-      <View style={style.container2}>
-        <Text style={style.textInput}>E-mail</Text>
-        <InputCustomizado placeholder='E-mail' valor={email} aoMudarTexto={setEmail}/>
-        <Text style={style.textInput}>Nome Completo</Text>
-        <InputCustomizado placeholder='Nome Completo' valor={nome} aoMudarTexto={setNome}/>
-        <Text style={style.textInput}>Data de Nascimento</Text>
-        <InputCustomizado placeholder='Data de Nascimento' valor={data} aoMudarTexto={setData}/>
-        <Text style={style.textInput}>Senha</Text>
-        <InputCustomizado placeholder='Senha' valor={senha} aoMudarTexto={setSenha} seguro={true}/>
-        <Text style={style.textInput}>Confirmar Senha</Text>
-        <InputCustomizado placeholder='Confirmar Senha' valor={confirmaSenha} aoMudarTexto={setConfirmaSenha} seguro={true}/>
-        <View style={style.container3}>
+    
+    <SafeAreaView style={estilos.recipientePrincipal}>
+      
+      <Text style={estilos.textoTitulo}>Cadastro</Text>
+      
+      <View style={estilos.cartao}>
+        
+        <Text style={estilos.rotuloEntrada}>Nome Completo</Text>
+        <InputCustomizado placeholder='Ex: João Ferreira' valor={nome} aoMudarTexto={definirNome}/>
+        
+        <Text style={estilos.rotuloEntrada}>E-mail</Text>
+        <InputCustomizado placeholder='exemplo@email.com' valor={email} aoMudarTexto={definirEmail}/>
+        
+        <Text style={estilos.rotuloEntrada}>Data de Nascimento</Text>
+        <InputCustomizado placeholder='DD/MM/AAAA' valor={data} aoMudarTexto={definirData}/>
+        
+        <Text style={estilos.rotuloEntrada}>Senha</Text>
+        <InputCustomizado placeholder='Mínimo 6 caracteres' valor={senha} aoMudarTexto={definirSenha} seguro={true}/>
+        
+        <Text style={estilos.rotuloEntrada}>Confirmar Senha</Text>
+        <InputCustomizado placeholder='Repita a senha' valor={confirmaSenha} aoMudarTexto={definirConfirmaSenha} seguro={true}/>
+        
+        <View style={estilos.recipienteBotao}>
           <View style={{flex: 1}}>
             <BotaoCustomizado text='Criar Conta' aoClicar={validarEEnviar}/>
           </View>
-          
         </View>
-        <View style={{
-          paddingTop: 15,
-          flexDirection:'row',
-          alignItems: 'center'
-          }}>
-          <Text style={{
-              color: Colors.text
-              }}>Já é Cadastrado? </Text>
-          <Text onPress={() => router.push('/login')} style={{
-              color: Colors.secondary
-              }}>Login.</Text>
+
+        <View style={estilos.recipienteLinkLogin}>
+          <Text style={estilos.textoFixo}>Já é Cadastrado? </Text>
+          <Text onPress={() => roteador.push('/login')} style={estilos.linkLogin}>
+            Faça Login.
+          </Text>
         </View>
+
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
-const style = StyleSheet.create({
-  container1: {
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center',
-    backgroundColor: Colors.background
-  },
-  container2: {
-    width: '90%',
+const estilos = StyleSheet.create({
+  cartao: {
     backgroundColor: Colors.card,
     borderRadius: 30,
     elevation: 5,
-    padding: 30
+    padding: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    width: '90%',
   },
-  container3: {
+  linkLogin: {
+    color: Colors.secondary,
+    fontWeight: 'bold',
+  },
+  recipienteBotao: {
+    flexDirection: 'row',
+    gap: 20,
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  recipienteLinkLogin: {
+    alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 20
-
+    paddingTop: 20,
   },
-  textInput: {
+  recipientePrincipal: {
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+    flex: 1, 
+    justifyContent: 'center', 
+  },
+  rotuloEntrada: {
     color: Colors.text,
     fontWeight: '600',
-    marginBottom: 5
+    marginBottom: 5,
   },
-  textTitulo: {
+  textoFixo: {
+    color: Colors.text,
+  },
+  textoTitulo: {
+    alignSelf: "flex-start", 
+    color: Colors.secondary, 
     fontSize: 28, 
     fontWeight: 'bold', 
-    color: Colors.secondary, 
-    textAlignVertical: 'top', 
-    alignSelf: "flex-start", 
     marginBottom: 15, 
-    marginLeft: '5%'  
+    marginLeft: '5%',
+    textAlignVertical: 'top', 
   },
-})
+});
