@@ -1,9 +1,10 @@
 import { BotaoCustomizado } from '@/src/components/BotaoCustomizado';
 import { InputCustomizado } from '@/src/components/InputCustomizado';
 import { FontAwesome } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context'; // Importação da caixa inteligente
 import { Colors } from "../constants/colors";
 
@@ -19,8 +20,44 @@ export default function Login() {
   const [perfil, definirPerfil] = useState('Aluno'); 
 
   // Função que será chamada quando apertar o botão Entrar (Mock do Back-end)
-  const executarLogin = () => {
-    roteador.replace('/(tabs)');
+  const executarLogin = async () => {
+    // 1. Cláusula de Guarda: Verifica se o usuário não deixou nada em branco
+    if (!email || !senha) {
+      Alert.alert("Atenção", "Por favor, preencha seu e-mail e senha.");
+      return;
+    }
+
+    // 2. Monta o pacote apenas com as credenciais
+    const credenciais = {
+      email: email,
+      senha: senha
+    };
+
+    try {
+      // ⚠️ Use o mesmo IP do seu Linux Mint que funcionou no Cadastro
+      const resposta = await fetch("http://10.0.9.202:8080/api/usuarios/login", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(credenciais)
+      });
+
+      // 3. Verifica a resposta do servidor
+      if (resposta.ok) {
+        // Se o Java retornou "200 OK", a senha está certa!
+        // Antes de pular para a próxima tela, salvamos o perfil.
+        // Usamos uma chave chamada '@orienta_perfil' para achar essa informação depois.
+        await AsyncStorage.setItem('@orienta_perfil', perfil);
+        roteador.replace('/(tabs)'); 
+      } else {
+        // Se o Java retornou erro (ex: 401 Unauthorized ou 404 Not Found)
+        Alert.alert("Acesso Negado", "E-mail ou senha incorretos.");
+      }
+    } catch (error) {
+      Alert.alert("Erro de Conexão", "Não foi possível conectar ao servidor.");
+      console.error("Erro no login: ", error);
+    }
   }; 
 
   return (
