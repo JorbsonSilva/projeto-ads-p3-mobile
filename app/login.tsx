@@ -35,7 +35,7 @@ export default function Login() {
 
     try {
       // ⚠️ Use o mesmo IP do seu Linux Mint que funcionou no Cadastro
-      const resposta = await fetch("http://10.0.9.202:8080/api/usuarios/login", {
+      const resposta = await fetch("http://10.0.11.93:8080/api/usuarios/login", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

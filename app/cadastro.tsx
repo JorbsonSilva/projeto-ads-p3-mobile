@@ -42,7 +42,7 @@ export default function Cadastro() {
 
     try {
       //  IMPORTANTE: Troque o SEU_IP_AQUI pelo seu IP da rede Wi-Fi (ex: 192.168.1.10)
-      const resposta = await fetch("http://10.0.9.202:8080/api/usuarios/cadastro", {
+      const resposta = await fetch("http://10.0.11.93:8080/api/usuarios/cadastro", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json' // 🟢 Corrigido o erro de digitação
