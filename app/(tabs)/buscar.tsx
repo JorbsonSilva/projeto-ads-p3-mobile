@@ -10,7 +10,7 @@ export default function Buscar() {
       
       <View style={estilos.conteudo}>
         <Text style={estilos.textoTitulo}>Buscar</Text>
-        <Text>Tela em Contrução!</Text>
+        <Text>Tela em Construção!</Text>
       </View>
 
     </SafeAreaView>
