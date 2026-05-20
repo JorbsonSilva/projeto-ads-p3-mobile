@@ -1,3 +1,4 @@
+import { API_URL } from '@/config/api';
 import { Colors } from '@/constants/colors';
 import axios from 'axios';
 import React, { useEffect, useState } from 'react';
@@ -33,7 +34,7 @@ export default function Agenda() {
   const [justificativa, setJustificativa] = useState('');
 
   // ⚠️ COLOQUE SEU IP AQUI
-  const apiUrl = `http://192.168.0.13:8080/agendamentos`; 
+  const apiUrl = `${API_URL}/agendamentos`; 
 
   const buscarAgendamentos = async () => {
     setCarregando(true);

@@ -4,9 +4,11 @@ import { FontAwesome } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { API_URL } from "../config/api";
 import { Colors } from "../constants/colors";
+
 
 /**
  * COMPONENTE DE LOGIN (Porta de Entrada e Autenticação)
@@ -26,6 +28,11 @@ export default function Login() {
   const [email, definirEmail] = useState("");
   const [senha, definirSenha] = useState("");
   const [perfil, definirPerfil] = useState("Aluno"); // Padrão selecionado
+  const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [modalErroVisivel, setModalErroVisivel] = useState(false);
+  const [modalErroTexto, setModalErroTexto] = useState("");
+  const [emailErro, setEmailErro] = useState("");
+  const [senhaErro, setSenhaErro] = useState("");
 
   // ==========================================
   // 2. FUNÇÃO DE INTEGRAÇÃO COM A API (Autenticação)
@@ -40,10 +47,17 @@ export default function Login() {
    */
   const executarLogin = async () => {
     // Cláusula de Guarda: Validação Front-end
-    if (!email || !senha) {
-      Alert.alert("Atenção", "Por favor, preencha seu e-mail e senha.");
+    const emailValido = !!email.trim();
+    const senhaValida = !!senha.trim();
+
+    if (!emailValido || !senhaValida) {
+      setEmailErro(emailValido ? "" : "Por favor, insira seu e-mail.");
+      setSenhaErro(senhaValida ? "" : "Por favor, insira sua senha.");
       return;
     }
+
+    setEmailErro("");
+    setSenhaErro("");
 
     // Payload (Carga de dados) que será enviada ao Back-end
     const credenciais = {
@@ -54,7 +68,7 @@ export default function Login() {
     try {
       // Fazendo a chamada HTTP POST para o Spring Boot
       const resposta = await fetch(
-        "http://192.168.0.104:8080/api/usuarios/login",
+        `${API_URL}/api/usuarios/login`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -80,7 +94,15 @@ export default function Login() {
         roteador.replace("/(tabs)");
       } else {
         // Tratamento de Erro de Autenticação (Ex: 401 Unauthorized)
-        Alert.alert("Acesso Negado", "E-mail ou senha incorretos.");
+        let bodyError = "";
+        try {
+          const json = await resposta.json();
+          bodyError = json?.message || json?.error || "";
+        } catch {
+          bodyError = await resposta.text();
+        }
+        setModalErroTexto(bodyError || "E-mail ou senha incorretos.");
+        setModalErroVisivel(true);
       }
     } catch (error) {
       // Tratamento de Erro de Rede (Servidor desligado, sem internet, IP errado, etc.)
@@ -159,16 +181,28 @@ export default function Login() {
             <InputCustomizado
               placeholder="Digite seu email"
               valor={email}
-              aoMudarTexto={definirEmail}
+              aoMudarTexto={(texto) => {
+                definirEmail(texto);
+                if (texto.trim()) setEmailErro("");
+              }}
             />
+            
+            {emailErro ? <Text style={estilos.textoErro}>{emailErro}</Text> : null}
 
             <Text style={estilos.rotuloEntrada}>Senha</Text>
             <InputCustomizado
               placeholder="Digite sua senha"
               valor={senha}
-              aoMudarTexto={definirSenha}
+              aoMudarTexto={(texto) => {
+                definirSenha(texto);
+                if (texto.trim()) setSenhaErro("");
+              }}
               seguro={true} // Esconde os caracteres da senha
+              mostrarSenha={mostrarSenha}
+              aoAlternarSenha={() => setMostrarSenha((anterior) => !anterior)}
             />
+
+            {senhaErro ? <Text style={estilos.textoErro}>{senhaErro}</Text> : null}
 
             {/* Botão de Ação Principal */}
             <BotaoCustomizado text="Entrar" aoClicar={executarLogin} />
@@ -208,6 +242,20 @@ export default function Login() {
           </Text>
         </View>
       </View>
+      <Modal transparent visible={modalErroVisivel} animationType="fade">
+        <View style={estilos.modalOverlay}>
+          <View style={estilos.modalCard}>
+            <Text style={estilos.modalTitulo}>Erro</Text>
+            <Text style={estilos.modalTexto}>{modalErroTexto}</Text>
+            <TouchableOpacity
+              style={estilos.modalBotao}
+              onPress={() => setModalErroVisivel(false)}
+            >
+              <Text style={estilos.modalBotaoTexto}>Entendi</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        </Modal>
     </SafeAreaView>
   );
 }
@@ -296,4 +344,53 @@ const estilos = StyleSheet.create({
   textoBemVindo: { color: "white", fontSize: 28, fontWeight: "bold" },
   textoFixoRodape: { color: Colors.text },
   textoOu: { marginHorizontal: 15 },
+  
+  modalOverlay: {
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.25)",
+    flex: 1,
+    justifyContent: "center",
+  },
+  modalCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 24,
+    elevation: 8,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    width: "80%",
+  },
+  modalTitulo: {
+    color: Colors.secondary,
+    fontSize: 22,
+    fontWeight: "bold",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  modalTexto: {
+    color: Colors.text,
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  modalBotao: {
+    backgroundColor: Colors.secondary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: "center",
+  },
+  modalBotaoTexto: {
+    color: "white",
+    fontWeight: "bold",
+  },
+
+  textoErro: {
+    color: "#CC4444",
+    fontSize: 13,
+    marginTop: 4,
+    marginBottom: 10,
+  },
 });
