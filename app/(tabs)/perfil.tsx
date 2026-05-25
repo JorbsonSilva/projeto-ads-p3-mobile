@@ -1,3 +1,4 @@
+import { API_URL } from "@/config/api";
 import { Colors } from "@/constants/colors";
 import { FontAwesome5, MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -7,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -19,7 +21,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function PerfilPeca1() {
   const roteador = useRouter();
-  const URL_BACKEND = "http://192.168.0.104:8080";
+  const URL_BACKEND = `${API_URL}`;
 
   // ==========================================
   // 1. ESTADOS DO COMPONENTE
@@ -38,6 +40,7 @@ export default function PerfilPeca1() {
   const [senhaAtual, setSenhaAtual] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
+  const [mostrarConfirmLogout, setMostrarConfirmLogout] = useState(false);
 
   const [expandirInfo, setExpandirInfo] = useState(false);
   const [expandirSeguranca, setExpandirSeguranca] = useState(false);
@@ -116,21 +119,29 @@ export default function PerfilPeca1() {
     await AsyncStorage.setItem("@orienta_perfil", novoPerfil);
   };
 
-  const deslogarSistema = async () => {
-    Alert.alert("Sair", "Deseja encerrar sua sessão?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Sair",
-        style: "destructive",
-        onPress: async () => {
-          await AsyncStorage.multiRemove([
-            "@orienta_perfil",
-            "@orienta_usuario_id",
-          ]);
-          roteador.replace("/login");
-        },
-      },
-    ]);
+  
+
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.multiRemove(["@orienta_perfil", "@orienta_usuario_id"]);
+    } catch (error) {
+      console.error("Erro ao limpar storage:", error);
+    } finally {
+      roteador.replace("/login");
+    }
+  };
+
+  const deslogarSistema = () => {
+    setMostrarConfirmLogout(true);
+  };
+
+  const confirmarLogout = async () => {
+    setMostrarConfirmLogout(false);
+    await handleLogout();
+  };
+
+  const cancelarLogout = () => {
+    setMostrarConfirmLogout(false);
   };
 
   const atualizarDadosPessoais = async () => {
@@ -823,6 +834,30 @@ export default function PerfilPeca1() {
             </View>
           )}
         </ScrollView>
+        <Modal transparent visible={mostrarConfirmLogout} animationType="fade">
+          <View style={estilos.modalOverlay}>
+            <View style={estilos.modalCard}>
+              <Text style={estilos.modalTitulo}>Encerrar sessão?</Text>
+              <Text style={estilos.modalTexto}>
+                Deseja realmente sair do aplicativo?
+              </Text>
+              <View style={estilos.modalBotoes}>
+                <TouchableOpacity
+                  style={[estilos.modalBotao, estilos.modalBotaoCancelar]}
+                  onPress={cancelarLogout}
+                >
+                  <Text style={estilos.modalBotaoTextoCancelar}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[estilos.modalBotao, estilos.modalBotaoConfirmar]}
+                  onPress={confirmarLogout}
+                >
+                  <Text style={estilos.modalBotaoTexto}>Sair</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -1048,6 +1083,63 @@ const estilos = StyleSheet.create({
   },
   textoNivel: { fontSize: 12, color: Colors.text },
   textoNivelAtivo: { color: "#FFF", fontWeight: "bold" },
+  modalOverlay: {
+    backgroundColor: "rgba(0,0,0,0.35)",
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 20,
+    padding: 24,
+    width: "85%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  modalTitulo: {
+    color: Colors.secondary,
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  modalTexto: {
+    color: Colors.text,
+    fontSize: 15,
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  modalBotoes: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  modalBotao: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBotaoCancelar: {
+    backgroundColor: Colors.border,
+  },
+  modalBotaoConfirmar: {
+    backgroundColor: Colors.secondary,
+  },
+  modalBotaoTexto: {
+    color: "white",
+    fontWeight: "bold",
+  },
+  modalBotaoTextoCancelar: {
+    color: Colors.text,
+    fontWeight: "bold",
+  },
+  
   botaoConfirmarMini: {
     backgroundColor: Colors.secondary,
     padding: 12,
