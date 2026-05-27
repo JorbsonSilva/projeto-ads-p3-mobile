@@ -1,3 +1,5 @@
+import BotaoRapido from "@/components/BotaoRapido";
+import ResumoProfessor from "@/components/ResumoProfessor";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -183,10 +185,76 @@ function HomeAluno({ nome }: { nome: string }) {
 }
 
 // ==========================================
-// 3. TELA DO PROFESSOR (DASHBOARD)
+// 3. TELA DO PROFESSOR (DASHBOARD INTEGRADO)
 // ==========================================
 function HomeProfessor({ nome }: { nome: string }) {
+  const { usuarioId } = useAuth(); // 🟢 Puxa o ID do professor logado
   const [proximasAulas, setProximasAulas] = useState<any[]>([]);
+  const [carregando, setCarregando] = useState(true);
+
+  // 🟢 1. Busca as aulas do professor no banco
+  const buscarAulasProfessor = async () => {
+    if (!usuarioId) return;
+    try {
+      const res = await fetch(`${API_URL}/agendamentos/professor/${usuarioId}`);
+      if (res.ok) {
+        const dados = await res.json();
+        setProximasAulas(dados);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar aulas do professor", error);
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  useEffect(() => {
+    buscarAulasProfessor();
+  }, [usuarioId]);
+
+  // 🟢 2. Função para Aceitar
+  const lidarComAceite = async (idAgendamento: number) => {
+    try {
+      const res = await fetch(
+        `${API_URL}/agendamentos/${idAgendamento}/aceitar`,
+        { method: "PUT" },
+      );
+      if (res.ok) {
+        alert("Aula confirmada com sucesso!");
+        buscarAulasProfessor();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // 🟢 3. Função para Recusar
+  const lidarComRecusa = async (idAgendamento: number) => {
+    try {
+      const res = await fetch(
+        `${API_URL}/agendamentos/${idAgendamento}/cancelar`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ justificativa: "Recusado pelo professor" }),
+        },
+      );
+      if (res.ok) {
+        alert("Agendamento recusado.");
+        buscarAulasProfessor();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // 🟢 4. Cálculos para os seus Cards de Resumo
+  const aulasRealizadas = proximasAulas.filter(
+    (a) => a.status === "CONFIRMADO",
+  ).length;
+  const alunosPendentes = proximasAulas.filter(
+    (a) => a.status === "PENDENTE",
+  ).length;
 
   return (
     <View style={estilos.telaGeral}>
@@ -203,6 +271,7 @@ function HomeProfessor({ nome }: { nome: string }) {
           onNotificationPress={() => console.log("Abrir Notificações")}
         />
 
+        {/* 🟢 SEU RESUMO AGORA É DINÂMICO */}
         <View style={estilos.cardResumoGeral}>
           <View style={estilos.resumoGeralHeader}>
             <Text style={estilos.resumoGeralTitulo}>Resumo geral</Text>
@@ -213,14 +282,14 @@ function HomeProfessor({ nome }: { nome: string }) {
           <View style={estilos.containerMetricas}>
             <ResumoProfessor
               icon="award"
-              titulo="Aulas realizadas"
-              valor="0"
+              titulo="Aulas ativas"
+              valor={String(aulasRealizadas)}
               fundo="#FFF0E7"
             />
             <ResumoProfessor
               icon="users"
-              titulo="Alunos atendidos"
-              valor="0"
+              titulo="Solicitações"
+              valor={String(alunosPendentes)}
               fundo="#EEF5FF"
             />
             <ResumoProfessor
@@ -231,7 +300,7 @@ function HomeProfessor({ nome }: { nome: string }) {
             />
             <ResumoProfessor
               icon="clock"
-              titulo="Horas ministradas"
+              titulo="Horas"
               valor="0h"
               fundo="#F5EEFF"
             />
@@ -246,7 +315,7 @@ function HomeProfessor({ nome }: { nome: string }) {
           <BotaoRapido icon="dollar-sign" texto="Ganhos" />
         </View>
 
-        {/* Banner Call to Action (Via Componente) */}
+        {/* Banner Call to Action (Mantido Intacto) */}
         <BannerCallToAction
           tituloLinha1="Defina suas aulas"
           tituloLinha2="como pagas ou"
@@ -258,26 +327,36 @@ function HomeProfessor({ nome }: { nome: string }) {
         />
 
         <SectionTitle
-          titulo="Próximas aulas"
+          titulo="Solicitações e Próximas aulas"
           onPressLink={() => console.log("Ver todas as aulas")}
         />
 
+        {/* 🟢 LISTA DE AULAS INTEGRADA */}
         <View style={estilos.listaAulasContainer}>
-          {proximasAulas.length > 0 ? (
-            proximasAulas.map((aula, index) => (
+          {carregando ? (
+            <ActivityIndicator
+              size="small"
+              color="#FF6B1A"
+              style={{ padding: 20 }}
+            />
+          ) : proximasAulas.length > 0 ? (
+            proximasAulas.map((aula) => (
               <AulaProfessor
-                key={index}
-                nome={aula.aluno.nome}
-                materia={aula.materia.nome}
+                key={aula.id}
+                id={aula.id}
+                nome={aula.aluno?.nome || "Aluno"}
+                materia="Aula particular" // Fallback seguro
                 data={aula.data}
-                hora={aula.hora}
+                hora={aula.hora.substring(0, 5)}
                 status={aula.status}
-                foto="https://i.pravatar.cc/150"
+                foto={"https://i.pravatar.cc/150?u=" + aula.aluno?.id}
+                onAceitar={lidarComAceite}
+                onRecusar={lidarComRecusa}
               />
             ))
           ) : (
             <Text style={estilos.textoVazioCentralizado}>
-              Não há aulas agendadas.
+              Não há aulas agendadas ou solicitações.
             </Text>
           )}
         </View>
@@ -287,88 +366,109 @@ function HomeProfessor({ nome }: { nome: string }) {
 }
 
 // ==========================================
-// 4. COMPONENTES LOCAIS MENORES
+// 4. COMPONENTES LOCAIS MENORES (Outros foram omitidos para focar no AulaProfessor)
 // ==========================================
-function MiniInfo({ icon, title }: { icon: any; title: string }) {
-  return (
-    <View style={estilos.miniInfoContainer}>
-      <Feather name={icon} size={24} color="#FF6B1A" />
-      <Text style={estilos.miniInfoTexto}>{title}</Text>
-    </View>
-  );
-}
 
-function ResumoProfessor({
-  icon,
-  titulo,
-  valor,
-  fundo,
-}: {
-  icon: any;
-  titulo: string;
-  valor: string;
-  fundo: string;
-}) {
-  return (
-    <View style={[estilos.metricaCard, { backgroundColor: fundo }]}>
-      <Feather name={icon} size={22} color="#FF6B1A" />
-      <Text style={estilos.metricaTitulo}>{titulo}</Text>
-      <Text style={estilos.metricaValor}>{valor}</Text>
-    </View>
-  );
-}
-
-function BotaoRapido({ icon, texto }: { icon: any; texto: string }) {
-  return (
-    <TouchableOpacity style={estilos.botaoRapidoCard}>
-      <Feather name={icon} size={24} color="#0057B8" />
-      <Text style={estilos.botaoRapidoTexto}>{texto}</Text>
-    </TouchableOpacity>
-  );
-}
+// ... (Mantenha seus componentes MiniInfo, ResumoProfessor e BotaoRapido exatamente como estão) ...
 
 function AulaProfessor({
+  id,
   nome,
   materia,
   data,
   hora,
   status,
   foto,
+  onAceitar,
+  onRecusar,
 }: {
+  id: number;
   nome: string;
   materia: string;
   data: string;
   hora: string;
   status: string;
   foto: string;
+  onAceitar: (id: number) => void;
+  onRecusar: (id: number) => void;
 }) {
-  const pendente = status === "Pendente";
+  const pendente = status === "PENDENTE";
+  const confirmado = status === "CONFIRMADO";
+  const cancelado = status === "CANCELADO";
+
   return (
     <View style={estilos.aulaListaItem}>
       <Image source={{ uri: foto }} style={estilos.aulaListaFoto} />
-      <View style={{ flex: 1 }}>
+
+      <View style={{ flex: 1, paddingRight: 10 }}>
         <Text style={estilos.aulaListaNome}>{nome}</Text>
         <Text style={estilos.aulaListaMateria}>{materia}</Text>
         <Text style={estilos.aulaListaData}>
           📅 {data} • {hora}
         </Text>
+
+        {/* 🟢 SE ESTIVER PENDENTE, MOSTRA OS BOTÕES */}
+        {pendente && (
+          <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+            <TouchableOpacity
+              style={{
+                backgroundColor: "#008A46",
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 8,
+                flex: 1,
+                alignItems: "center",
+              }}
+              onPress={() => onAceitar(id)}
+            >
+              <Text style={{ color: "#FFF", fontSize: 12, fontWeight: "bold" }}>
+                Aceitar
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                backgroundColor: "#D93838",
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 8,
+                flex: 1,
+                alignItems: "center",
+              }}
+              onPress={() => onRecusar(id)}
+            >
+              <Text style={{ color: "#FFF", fontSize: 12, fontWeight: "bold" }}>
+                Recusar
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
+
       <View
         style={[
           estilos.aulaTagStatus,
-          { backgroundColor: pendente ? "#FFF0D9" : "#DDF8E8" },
+          {
+            backgroundColor: pendente
+              ? "#FFF0D9"
+              : confirmado
+                ? "#DDF8E8"
+                : "#F0F0F0",
+          },
         ]}
       >
         <Text
           style={[
             estilos.aulaTagTexto,
-            { color: pendente ? "#D88400" : "#008A46" },
+            { color: pendente ? "#D88400" : confirmado ? "#008A46" : "#777" },
           ]}
         >
           {status}
         </Text>
       </View>
-      <Feather name="chevron-right" size={20} color="#999" />
+
+      {/* Esconde a setinha se estiver pendente, para não poluir com os botões */}
+      {!pendente && <Feather name="chevron-right" size={20} color="#999" />}
     </View>
   );
 }

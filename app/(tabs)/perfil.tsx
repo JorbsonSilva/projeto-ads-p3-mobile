@@ -1,5 +1,6 @@
 import { API_URL } from "@/config/api";
 import { Colors } from "@/constants/colors";
+import { useAuth } from "@/context/AuthContext"; // 🟢 1. IMPORTAÇÃO DO CONTEXTO GLOBAL
 import { FontAwesome5, MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
@@ -19,6 +20,16 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+const diasDaSemanaDisponiveis = [
+  "Segunda",
+  "Terça",
+  "Quarta",
+  "Quinta",
+  "Sexta",
+  "Sábado",
+  "Domingo",
+];
+
 export default function PerfilPeca1() {
   const roteador = useRouter();
   const URL_BACKEND = `${API_URL}`;
@@ -29,8 +40,8 @@ export default function PerfilPeca1() {
   const [carregando, setCarregando] = useState(true);
   const [usuarioId, setUsuarioId] = useState<string | null>(null);
 
-  // 🟢 ESTADO DO CHAVEADOR (Aluno ou Professor)
-  const [perfilAtivo, setPerfilAtivo] = useState("Aluno");
+  // 🟢 2. ESTADO DO CHAVEADOR AGORA VEM DO CONTEXTO GLOBAL
+  const { perfilAtivo, alternarPerfilGlobal } = useAuth() as any;
 
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
@@ -50,20 +61,25 @@ export default function PerfilPeca1() {
   // ==========================================
   const [bioAluno, setBioAluno] = useState("");
   const [buscaSaber, setBuscaSaber] = useState("");
-  const [catalogoSaberesBD, setCatalogoSaberesBD] = useState<any[]>([]); // Matérias vindas do banco
-  const [interesses, setInteresses] = useState<any[]>([]); // Matérias que o aluno selecionou
+  const [catalogoSaberesBD, setCatalogoSaberesBD] = useState<any[]>([]);
+  const [interesses, setInteresses] = useState<any[]>([]);
 
   // ==========================================
   // ESTADOS DA PEÇA 3 (Área do Professor)
   // ==========================================
   const [bioProfessor, setBioProfessor] = useState("");
-  const [aptidoes, setAptidoes] = useState<any[]>([]); // Lista de aptidões salvas
+  const [aptidoes, setAptidoes] = useState<any[]>([]);
 
-  // Controles do Formulário de nova aptidão
   const [buscaSaberProf, setBuscaSaberProf] = useState("");
   const [saberProfSelecionado, setSaberProfSelecionado] = useState<any>(null);
   const [nivelProf, setNivelProf] = useState("Iniciante");
   const [precoProf, setPrecoProf] = useState("");
+
+  // 🟢 NOVOS ESTADOS PARA A DISPONIBILIDADE DE HORÁRIOS DO PROFESSOR
+  const [disponibilidades, setDisponibilidades] = useState<any[]>([]);
+  const [diaSelecionado, setDiaSelecionado] = useState("Segunda");
+  const [horaInicio, setHoraInicio] = useState("");
+  const [horaFim, setHoraFim] = useState("");
 
   // ==========================================
   // 2. CICLO DE VIDA (Busca e Inicialização)
@@ -72,14 +88,9 @@ export default function PerfilPeca1() {
     const inicializarPerfil = async () => {
       try {
         const idSalvo = await AsyncStorage.getItem("@orienta_usuario_id");
-        const perfilSalvo = await AsyncStorage.getItem("@orienta_perfil"); // 🟢 Lendo o perfil do Login
-
         if (!idSalvo) return roteador.replace("/login");
 
         setUsuarioId(idSalvo);
-
-        // 🟢 Respeita a pre-seleção do Login
-        if (perfilSalvo) setPerfilAtivo(perfilSalvo);
 
         const resposta = await fetch(`${URL_BACKEND}/api/usuarios/${idSalvo}`);
         if (resposta.ok) {
@@ -88,14 +99,17 @@ export default function PerfilPeca1() {
           setEmail(dadosUsuario.email || "");
           setNascimento(dadosUsuario.dataNascimento || "");
           setCpf(dadosUsuario.cpf || "");
-          // 🟢 Puxa os dados específicos do Aluno (se já existirem no banco)
+
           setBioAluno(dadosUsuario.bioAluno || "");
           setInteresses(dadosUsuario.interesses || []);
-          // 🟢 Puxa os dados específicos do Professor
+
           setBioProfessor(dadosUsuario.bioProfessor || "");
           setAptidoes(dadosUsuario.aptidoes || []);
-        } // <-- Aqui é a chave fechando o if (resposta.ok) original
-        // 🟢 Busca o catálogo de disciplinas cadastradas no banco (tb_saberes)
+
+          // 🟢 Puxa as disponibilidades salvas no banco
+          setDisponibilidades(dadosUsuario.disponibilidades || []);
+        }
+
         const respostaSaberes = await fetch(`${URL_BACKEND}/api/saberes`);
         if (respostaSaberes.ok) {
           const dadosSaberes = await respostaSaberes.json();
@@ -114,16 +128,20 @@ export default function PerfilPeca1() {
   // 3. REGRAS DE NEGÓCIO
   // ==========================================
   const alternarPerfil = async (novoPerfil: string) => {
-    setPerfilAtivo(novoPerfil);
-    // Opcional: Salva a preferência atual para a próxima vez que ele abrir
-    await AsyncStorage.setItem("@orienta_perfil", novoPerfil);
+    // 🟢 Chama a função do AuthContext para alterar o App inteiro
+    if (alternarPerfilGlobal) {
+      alternarPerfilGlobal(novoPerfil);
+    } else {
+      Alert.alert("Erro", "Contexto global de perfil não encontrado.");
+    }
   };
-
-  
 
   const handleLogout = async () => {
     try {
-      await AsyncStorage.multiRemove(["@orienta_perfil", "@orienta_usuario_id"]);
+      await AsyncStorage.multiRemove([
+        "@orienta_perfil",
+        "@orienta_usuario_id",
+      ]);
     } catch (error) {
       console.error("Erro ao limpar storage:", error);
     } finally {
@@ -200,7 +218,6 @@ export default function PerfilPeca1() {
       : [];
 
   const adicionarInteresse = (saberSelecionado: any) => {
-    // Valida se a matéria já está na lista (tratando o formato do Java)
     if (
       interesses.some(
         (item) =>
@@ -211,7 +228,7 @@ export default function PerfilPeca1() {
       return Alert.alert("Aviso", "Você já adicionou esta matéria.");
     }
     setInteresses([...interesses, { saber: saberSelecionado }]);
-    setBuscaSaber(""); // Limpa a barra
+    setBuscaSaber("");
   };
 
   const removerInteresse = (saberIdParaRemover: number) => {
@@ -233,7 +250,6 @@ export default function PerfilPeca1() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             bio: bioAluno,
-            // Extraímos apenas os IDs para mandar para o Java depois
             interessesIds: interesses.map((item) => item.saber?.id || item.id),
           }),
         },
@@ -254,7 +270,7 @@ export default function PerfilPeca1() {
   };
 
   // ==========================================
-  // LÓGICA DA PEÇA 3: APTIDÕES (PROFESSOR)
+  // LÓGICA DA PEÇA 3: APTIDÕES E DISPONIBILIDADE (PROFESSOR)
   // ==========================================
   const saberesProfFiltrados =
     buscaSaberProf.length > 0
@@ -264,7 +280,6 @@ export default function PerfilPeca1() {
       : [];
 
   const prepararAptidao = (saberSelecionado: any) => {
-    // Verifica se já adicionou a matéria antes de abrir o mini-formulário
     if (
       aptidoes.some(
         (item) => (item.saber?.id || item.saberId) === saberSelecionado.id,
@@ -287,7 +302,7 @@ export default function PerfilPeca1() {
     };
 
     setAptidoes([...aptidoes, novaApt]);
-    setSaberProfSelecionado(null); // Fecha o mini-formulário
+    setSaberProfSelecionado(null);
     setPrecoProf("");
     setNivelProf("Iniciante");
   };
@@ -298,6 +313,32 @@ export default function PerfilPeca1() {
         (item) => (item.saber?.id || item.saberId) !== saberIdParaRemover,
       ),
     );
+  };
+
+  // 🟢 FUNÇÕES PARA ADICIONAR HORÁRIOS
+  const adicionarDisponibilidade = () => {
+    if (!horaInicio || !horaFim) {
+      return Alert.alert("Aviso", "Preencha o horário de início e fim.");
+    }
+
+    // Tratamento simples para garantir o formato HH:MM:SS exigido pelo Java LocalTime
+    const inicio = horaInicio.includes(":") ? horaInicio : `${horaInicio}:00`;
+    const fim = horaFim.includes(":") ? horaFim : `${horaFim}:00`;
+
+    const novaDisp = {
+      diaSemana: diaSelecionado,
+      horaInicio: inicio,
+      horaFim: fim,
+    };
+    setDisponibilidades([...disponibilidades, novaDisp]);
+    setHoraInicio("");
+    setHoraFim("");
+  };
+
+  const removerDisponibilidade = (index: number) => {
+    const novaLista = [...disponibilidades];
+    novaLista.splice(index, 1);
+    setDisponibilidades(novaLista);
   };
 
   const salvarPerfilProfessor = async () => {
@@ -316,6 +357,7 @@ export default function PerfilPeca1() {
           body: JSON.stringify({
             bio: bioProfessor,
             aptidoesNova: aptidoesMapeadas,
+            disponibilidadesNova: disponibilidades, // 🟢 Enviamos os horários para o back-end
           }),
         },
       );
@@ -357,6 +399,7 @@ export default function PerfilPeca1() {
           contentContainerStyle={estilos.conteudoTela}
           keyboardShouldPersistTaps="handled"
         >
+          {/* CABEÇALHO */}
           <View style={estilos.cabecalho}>
             <TouchableOpacity onPress={() => roteador.back()}>
               <MaterialIcons name="arrow-back" size={24} color={Colors.text} />
@@ -370,6 +413,7 @@ export default function PerfilPeca1() {
             </TouchableOpacity>
           </View>
 
+          {/* AVATAR E NOME */}
           <View style={estilos.containerAvatar}>
             <View style={estilos.avatarNeumorfico}>
               <Text style={estilos.letraAvatar}>
@@ -510,7 +554,7 @@ export default function PerfilPeca1() {
           </View>
 
           {/* ========================================== */}
-          {/* 🟢 NOVO: CHAVEADOR DE PERFIL (ALUNO/PROF)  */}
+          {/* CHAVEADOR DE PERFIL (ALUNO/PROF)           */}
           {/* ========================================== */}
           <View style={estilos.containerSelector}>
             <TouchableOpacity
@@ -648,7 +692,6 @@ export default function PerfilPeca1() {
                 ))}
               </View>
 
-              {/* Botão de Salvar Específico */}
               <TouchableOpacity
                 style={[
                   estilos.botaoSalvarSeccional,
@@ -816,6 +859,101 @@ export default function PerfilPeca1() {
                 ))}
               </View>
 
+              {/* ========================================== */}
+              {/* 🟢 NOVA SEÇÃO: HORÁRIOS DISPONÍVEIS         */}
+              {/* ========================================== */}
+              <View style={estilos.divisorVisual} />
+              <Text
+                style={[
+                  estilos.tituloSessao,
+                  { alignSelf: "flex-start", marginTop: 10 },
+                ]}
+              >
+                Sua Disponibilidade
+              </Text>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ marginVertical: 15, width: "100%" }}
+              >
+                {diasDaSemanaDisponiveis.map((dia) => (
+                  <TouchableOpacity
+                    key={dia}
+                    style={[
+                      estilos.tagDia,
+                      diaSelecionado === dia && estilos.tagDiaAtiva,
+                    ]}
+                    onPress={() => setDiaSelecionado(dia)}
+                  >
+                    <Text
+                      style={[
+                        estilos.textoDia,
+                        diaSelecionado === dia && estilos.textoDiaAtivo,
+                      ]}
+                    >
+                      {dia}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <View
+                style={{
+                  flexDirection: "row",
+                  gap: 10,
+                  width: "100%",
+                  marginBottom: 15,
+                }}
+              >
+                <View style={[estilos.inputNeumorfico, { flex: 1 }]}>
+                  <TextInput
+                    value={horaInicio}
+                    onChangeText={setHoraInicio}
+                    style={estilos.textoInput}
+                    placeholder="Das (ex: 08:00)"
+                    maxLength={5}
+                  />
+                </View>
+                <View style={[estilos.inputNeumorfico, { flex: 1 }]}>
+                  <TextInput
+                    value={horaFim}
+                    onChangeText={setHoraFim}
+                    style={estilos.textoInput}
+                    placeholder="Até (ex: 12:00)"
+                    maxLength={5}
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={estilos.botaoSecundario}
+                onPress={adicionarDisponibilidade}
+              >
+                <Text style={estilos.textoBotaoSecundario}>
+                  + Adicionar Horário
+                </Text>
+              </TouchableOpacity>
+
+              <View style={{ width: "100%", marginTop: 15 }}>
+                {disponibilidades.map((disp, i) => (
+                  <View key={i} style={estilos.cartaoAptidao}>
+                    <View>
+                      <Text style={estilos.tituloCartaoAptidao}>
+                        {disp.diaSemana}
+                      </Text>
+                      <Text style={estilos.textoDetalheAptidao}>
+                        {disp.horaInicio} às {disp.horaFim}
+                      </Text>
+                    </View>
+                    <TouchableOpacity onPress={() => removerDisponibilidade(i)}>
+                      <FontAwesome5 name="trash" size={16} color="#E74C3C" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+              {/* ========================================== */}
+
               <TouchableOpacity
                 style={[
                   estilos.botaoSalvarSeccional,
@@ -834,6 +972,8 @@ export default function PerfilPeca1() {
             </View>
           )}
         </ScrollView>
+
+        {/* MODAL DE LOGOUT */}
         <Modal transparent visible={mostrarConfirmLogout} animationType="fade">
           <View style={estilos.modalOverlay}>
             <View style={estilos.modalCard}>
@@ -950,7 +1090,6 @@ const estilos = StyleSheet.create({
   },
   textoMudarSenha: { color: Colors.primary, fontSize: 14, fontWeight: "bold" },
 
-  // 🟢 Estilos do Chaveador Aluno/Professor
   containerSelector: {
     flexDirection: "row",
     backgroundColor: Colors.input,
@@ -982,7 +1121,6 @@ const estilos = StyleSheet.create({
     color: Colors.card,
   },
 
-  // Estilos da área condicional
   blocoEspecifico: {
     padding: 20,
     backgroundColor: Colors.card,
@@ -1039,7 +1177,7 @@ const estilos = StyleSheet.create({
     borderRadius: 20,
   },
   textoTag: { color: Colors.card, fontSize: 13, fontWeight: "bold" },
-  // Estilos da Área do Professor
+
   miniFormAptidao: {
     width: "100%",
     backgroundColor: Colors.background,
@@ -1139,14 +1277,12 @@ const estilos = StyleSheet.create({
     color: Colors.text,
     fontWeight: "bold",
   },
-  
   botaoConfirmarMini: {
     backgroundColor: Colors.secondary,
     padding: 12,
     borderRadius: 8,
     alignItems: "center",
   },
-
   cartaoAptidao: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1160,4 +1296,31 @@ const estilos = StyleSheet.create({
   },
   tituloCartaoAptidao: { fontSize: 14, fontWeight: "bold", color: Colors.text },
   textoDetalheAptidao: { fontSize: 12, color: "#7f8c8d", marginTop: 2 },
+
+  // 🟢 ESTILOS DA GRADE DE HORÁRIOS ADICIONADOS AQUI
+  tagDia: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: "#F0F0F0",
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: "#EAEAEA",
+  },
+  tagDiaAtiva: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  textoDia: { fontWeight: "600", color: "#555" },
+  textoDiaAtivo: { color: "#FFF" },
+  botaoSecundario: {
+    width: "100%",
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    alignItems: "center",
+  },
+  textoBotaoSecundario: {
+    color: Colors.primary,
+    fontWeight: "bold",
+    fontSize: 15,
+  },
 });
