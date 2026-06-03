@@ -6,17 +6,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -38,10 +38,9 @@ export default function PerfilPeca1() {
   // 1. ESTADOS DO COMPONENTE
   // ==========================================
   const [carregando, setCarregando] = useState(true);
-  const [usuarioId, setUsuarioId] = useState<string | null>(null);
 
   // 🟢 2. ESTADO DO CHAVEADOR AGORA VEM DO CONTEXTO GLOBAL
-  const { perfilAtivo, alternarPerfilGlobal } = useAuth() as any;
+  const { perfilAtivo, alternarPerfilGlobal, usuarioId, carregandoAuth } = useAuth() as any;
 
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
@@ -85,14 +84,12 @@ export default function PerfilPeca1() {
   // 2. CICLO DE VIDA (Busca e Inicialização)
   // ==========================================
   useEffect(() => {
+    if (carregandoAuth) return;
+    if (!usuarioId) return roteador.replace("/login");
+
     const inicializarPerfil = async () => {
       try {
-        const idSalvo = await AsyncStorage.getItem("@orienta_usuario_id");
-        if (!idSalvo) return roteador.replace("/login");
-
-        setUsuarioId(idSalvo);
-
-        const resposta = await fetch(`${URL_BACKEND}/api/usuarios/${idSalvo}`);
+        const resposta = await fetch(`${URL_BACKEND}/api/usuarios/${usuarioId}`);
         if (resposta.ok) {
           const dadosUsuario = await resposta.json();
           setNome(dadosUsuario.nome || "");
@@ -122,7 +119,7 @@ export default function PerfilPeca1() {
       }
     };
     inicializarPerfil();
-  }, []);
+  }, [carregandoAuth, usuarioId]);
 
   // ==========================================
   // 3. REGRAS DE NEGÓCIO

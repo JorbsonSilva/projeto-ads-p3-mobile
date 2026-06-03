@@ -1,16 +1,13 @@
 import { Colors } from "@/constants/colors";
-import { AuthProvider } from "@/context/AuthContext";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context"; // 🟢 Importamos a fita métrica
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabsLayout() {
-  // 🟢 Pega as medidas exatas do sistema operacional do celular (bateria, botões, etc)
   const insets = useSafeAreaInsets();
 
   return (
-    <AuthProvider>
-      <Tabs
+    <Tabs
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: Colors.secondary,
@@ -79,6 +76,5 @@ export default function TabsLayout() {
           }}
         />
       </Tabs>
-    </AuthProvider>
   );
 }

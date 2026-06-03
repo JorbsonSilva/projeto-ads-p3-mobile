@@ -2,7 +2,7 @@ import BotaoRapido from "@/components/BotaoRapido";
 import ResumoProfessor from "@/components/ResumoProfessor";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -48,7 +48,7 @@ function HomeAluno({ nome }: { nome: string }) {
   const { usuarioId } = useAuth(); // 🟢 Puxa o ID do aluno logado
   const [categorias, setCategorias] = useState<any[]>([]);
   const [professoresDestaque, setProfessoresDestaque] = useState<any[]>([]);
-  const [textoBusca, setTextoBusca] = useState("");
+  const [carregandoProfessores, setCarregandoProfessores] = useState(false);
 
   useEffect(() => {
     const buscarDadosAluno = async () => {
@@ -62,6 +62,7 @@ function HomeAluno({ nome }: { nome: string }) {
 
         // 2. 🟢 Busca Professores Dinâmicos
         if (usuarioId) {
+          setCarregandoProfessores(true);
           const resProfs = await fetch(
             `${API_URL}/api/usuarios/professores/destaque/${usuarioId}`,
           );
@@ -69,9 +70,11 @@ function HomeAluno({ nome }: { nome: string }) {
             const dadosProfs = await resProfs.json();
             setProfessoresDestaque(dadosProfs);
           }
+          setCarregandoProfessores(false);
         }
       } catch (error) {
         console.error("Erro ao buscar dados do aluno", error);
+        setCarregandoProfessores(false);
       }
     };
     buscarDadosAluno();
@@ -145,8 +148,14 @@ function HomeAluno({ nome }: { nome: string }) {
         <SectionTitle titulo="Professores em destaque" />
 
         <View style={{ width: "100%" }}>
-          {professoresDestaque.length > 0 ? (
-            professoresDestaque.map((prof) => {
+          {carregandoProfessores ? (
+            <ActivityIndicator
+              size="large"
+              color="#FF6B1A"
+              style={{ marginTop: 24, marginBottom: 16 }}
+            />
+          ) : professoresDestaque.length > 0 ? (
+            professoresDestaque.slice(0, 5).map((prof) => {
               const primeiraMateria =
                 prof.aptidoes && prof.aptidoes.length > 0
                   ? prof.aptidoes[0].saber.nome
@@ -193,7 +202,7 @@ function HomeProfessor({ nome }: { nome: string }) {
   const [carregando, setCarregando] = useState(true);
 
   // 🟢 1. Busca as aulas do professor no banco
-  const buscarAulasProfessor = async () => {
+  const buscarAulasProfessor = useCallback(async () => {
     if (!usuarioId) return;
     try {
       const res = await fetch(`${API_URL}/agendamentos/professor/${usuarioId}`);
@@ -206,11 +215,11 @@ function HomeProfessor({ nome }: { nome: string }) {
     } finally {
       setCarregando(false);
     }
-  };
+  }, [usuarioId]);
 
   useEffect(() => {
     buscarAulasProfessor();
-  }, [usuarioId]);
+  }, [buscarAulasProfessor]);
 
   // 🟢 2. Função para Aceitar
   const lidarComAceite = async (idAgendamento: number) => {
@@ -394,7 +403,6 @@ function AulaProfessor({
 }) {
   const pendente = status === "PENDENTE";
   const confirmado = status === "CONFIRMADO";
-  const cancelado = status === "CANCELADO";
 
   return (
     <View style={estilos.aulaListaItem}>
