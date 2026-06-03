@@ -1,6 +1,6 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -23,20 +23,82 @@ export default function BuscaProfessores() {
   const [professoresFiltrados, setProfessoresFiltrados] = useState<any[]>([]);
   const [saberes, setSaberes] = useState<string[]>(["Todas"]); // 🟢 Estado para a lista oficial de matérias
   const [carregando, setCarregando] = useState(false);
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [paginaMaximaVisivel, setPaginaMaximaVisivel] = useState(1);
+  const [temMaisPaginas, setTemMaisPaginas] = useState(true);
+  const [paginaLocalFallback, setPaginaLocalFallback] = useState(false);
+  const PAGE_SIZE = 20;
 
   // Estados de Filtro
   const [busca, setBusca] = useState("");
   const [filtroMateria, setFiltroMateria] = useState("Todas");
   const [filtroPrecoMax, setFiltroPrecoMax] = useState(150);
+  const [ordenacao, setOrdenacao] = useState<
+    "maisRelevantes" | "maisBarato" | "maisCaro"
+  >("maisRelevantes");
 
   // Estados de Interface
   const [modalMateriaVisivel, setModalMateriaVisivel] = useState(false);
   const [modalPrecoVisivel, setModalPrecoVisivel] = useState(false);
+  const [modalOrdenacaoVisivel, setModalOrdenacaoVisivel] = useState(false);
+
+  const buscarProfessoresPagina = useCallback(
+    async (page: number) => {
+      setCarregando(true);
+
+      try {
+        const resProfs = await fetch(
+          `${API_URL}/api/usuarios/professores/destaque/${usuarioId || 1}?page=${page}&limit=${PAGE_SIZE}`,
+        );
+
+        if (resProfs.ok) {
+          const dadosProfs = await resProfs.json();
+          const servidorRetornouTudo = page === 1 && dadosProfs.length > PAGE_SIZE;
+
+          if (servidorRetornouTudo) {
+            setPaginaLocalFallback(true);
+            setPaginaMaximaVisivel(Math.ceil(dadosProfs.length / PAGE_SIZE));
+            setTemMaisPaginas(dadosProfs.length > PAGE_SIZE);
+          } else {
+            setPaginaLocalFallback(false);
+            setTemMaisPaginas(dadosProfs.length === PAGE_SIZE);
+            setPaginaMaximaVisivel((anterior) =>
+              Math.max(anterior, page + (dadosProfs.length === PAGE_SIZE ? 1 : 0)),
+            );
+          }
+
+          setProfessoresBanco(dadosProfs);
+          setProfessoresFiltrados(dadosProfs);
+          setPaginaAtual(page);
+        }
+      } catch (e) {
+        console.error("Erro ao buscar professors por página:", e);
+      } finally {
+        setCarregando(false);
+      }
+    },
+    [usuarioId],
+  );
+
+  const selecionarPagina = async (page: number) => {
+    if (page === paginaAtual || page < 1 || page > paginaMaximaVisivel) return;
+    if (paginaLocalFallback) {
+      setPaginaAtual(page);
+      return;
+    }
+    await buscarProfessoresPagina(page);
+  };
 
   // 1. BUSCA INICIAL NO BANCO DE DADOS
   useEffect(() => {
     const buscarDadosIniciais = async () => {
       setCarregando(true);
+      setPaginaAtual(1);
+      setTemMaisPaginas(true);
+      setPaginaLocalFallback(false);
+      setProfessoresBanco([]);
+      setProfessoresFiltrados([]);
+
       try {
         // 🟢 Busca as matérias oficiais (Saberes) do Banco
         const resSaberes = await fetch(`${API_URL}/api/saberes`);
@@ -47,15 +109,7 @@ export default function BuscaProfessores() {
           setSaberes(["Todas", ...nomesSaberes]);
         }
 
-        // Busca os professores
-        const resProfs = await fetch(
-          `${API_URL}/api/usuarios/professores/destaque/${usuarioId || 1}`,
-        );
-        if (resProfs.ok) {
-          const dadosProfs = await resProfs.json();
-          setProfessoresBanco(dadosProfs);
-          setProfessoresFiltrados(dadosProfs);
-        }
+        await buscarProfessoresPagina(1);
       } catch (e) {
         console.error("Erro ao buscar dados da tela de busca:", e);
       } finally {
@@ -63,9 +117,13 @@ export default function BuscaProfessores() {
       }
     };
     buscarDadosIniciais();
-  }, [usuarioId]);
+  }, [usuarioId, buscarProfessoresPagina]);
 
   // 2. MOTOR DE BUSCA EM TEMPO REAL
+  const professoresExibicao = paginaLocalFallback
+    ? professoresFiltrados.slice((paginaAtual - 1) * PAGE_SIZE, paginaAtual * PAGE_SIZE)
+    : professoresFiltrados;
+
   useEffect(() => {
     let resultado = professoresBanco;
 
@@ -91,8 +149,22 @@ export default function BuscaProfessores() {
       return precoProf <= filtroPrecoMax;
     });
 
+    if (ordenacao === "maisBarato") {
+      resultado = resultado.slice().sort((a, b) => {
+        const precoA = a.aptidoes?.[0]?.precoHora || 0;
+        const precoB = b.aptidoes?.[0]?.precoHora || 0;
+        return precoA - precoB;
+      });
+    } else if (ordenacao === "maisCaro") {
+      resultado = resultado.slice().sort((a, b) => {
+        const precoA = a.aptidoes?.[0]?.precoHora || 0;
+        const precoB = b.aptidoes?.[0]?.precoHora || 0;
+        return precoB - precoA;
+      });
+    }
+
     setProfessoresFiltrados(resultado);
-  }, [busca, filtroMateria, filtroPrecoMax, professoresBanco]);
+  }, [busca, filtroMateria, filtroPrecoMax, ordenacao, professoresBanco]);
 
   return (
     <View style={estilos.container}>
@@ -167,6 +239,21 @@ export default function BuscaProfessores() {
             </Text>
             <Feather name="chevron-down" size={18} color="#999" />
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={estilos.botaoFiltroLargo}
+            onPress={() => setModalOrdenacaoVisivel(true)}
+          >
+            <Feather name="sliders" size={20} color="#555" />
+            <Text style={estilos.textoFiltroBotao}>
+              {ordenacao === "maisRelevantes"
+                ? "Mais relevantes"
+                : ordenacao === "maisBarato"
+                ? "Mais barato"
+                : "Mais caro"}
+            </Text>
+            <Feather name="chevron-down" size={18} color="#999" />
+          </TouchableOpacity>
         </View>
 
         {/* Contador */}
@@ -176,14 +263,6 @@ export default function BuscaProfessores() {
               ? "Buscando..."
               : `${professoresFiltrados.length} professores encontrados`}
           </Text>
-          <TouchableOpacity
-            style={{ flexDirection: "row", alignItems: "center" }}
-          >
-            <Text style={{ color: "#0057B8", fontWeight: "600" }}>
-              Mais relevantes{" "}
-            </Text>
-            <Feather name="chevron-down" size={14} color="#0057B8" />
-          </TouchableOpacity>
         </View>
 
         {/* Renderização dos Cartões */}
@@ -195,20 +274,59 @@ export default function BuscaProfessores() {
               style={{ marginTop: 40 }}
             />
           ) : (
-            professoresFiltrados.map((prof) => (
-              <CardProfessor
-                key={prof.id}
-                nome={prof.nome}
-                materia={prof.aptidoes?.[0]?.saber?.nome || "Geral"}
-                nota={prof.notaMedia || 5.0}
-                avaliacoes={prof.totalAvaliacoes || 0}
-                precoHora={prof.aptidoes?.[0]?.precoHora || 0}
-                fotoUrl={
-                  prof.fotoUrl || "https://i.pravatar.cc/150?u=" + prof.id
-                }
-                onPress={() => router.push(`/professor/${prof.id}`)}
-              />
-            ))
+            <>
+              {professoresExibicao.map((prof) => (
+                <CardProfessor
+                  key={prof.id}
+                  nome={prof.nome}
+                  materia={prof.aptidoes?.[0]?.saber?.nome || "Geral"}
+                  nota={prof.notaMedia || 5.0}
+                  avaliacoes={prof.totalAvaliacoes || 0}
+                  precoHora={prof.aptidoes?.[0]?.precoHora || 0}
+                  fotoUrl={
+                    prof.fotoUrl || "https://i.pravatar.cc/150?u=" + prof.id
+                  }
+                  onPress={() => router.push(`/professor/${prof.id}`)}
+                />
+              ))}
+
+              <View style={estilos.paginacaoContainer}>
+                {Array.from({ length: paginaMaximaVisivel }, (_, index) => {
+                  const numeroPagina = index + 1;
+                  return (
+                    <TouchableOpacity
+                      key={numeroPagina}
+                      style={[
+                        estilos.paginaBotao,
+                        paginaAtual === numeroPagina && estilos.paginaBotaoAtivo,
+                      ]}
+                      onPress={() => selecionarPagina(numeroPagina)}
+                    >
+                      <Text
+                        style={
+                          paginaAtual === numeroPagina
+                            ? estilos.textoPaginaAtiva
+                            : estilos.textoPagina
+                        }
+                      >
+                        {numeroPagina}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {temMaisPaginas ? (
+                <Text style={estilos.rodapeLista}>
+                  Há mais páginas disponíveis. Selecione a próxima página.
+                </Text>
+              ) : (
+                professoresBanco.length > 0 && (
+                  <Text style={estilos.rodapeLista}>
+                    Você chegou à última página disponível.
+                  </Text>
+                )
+              )}
+            </>
           )}
         </View>
       </ScrollView>
@@ -253,6 +371,50 @@ export default function BuscaProfessores() {
             <TouchableOpacity
               style={estilos.botaoFecharModal}
               onPress={() => setModalMateriaVisivel(false)}
+            >
+              <Text style={{ color: "#FFF", fontWeight: "bold" }}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Ordenação */}
+      <Modal visible={modalOrdenacaoVisivel} transparent animationType="slide">
+        <View style={estilos.fundoModal}>
+          <View style={estilos.containerModal}>
+            <Text style={estilos.tituloModal}>Ordenar professores</Text>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={{ maxHeight: 280 }}
+            >
+              {[
+                { key: "maisRelevantes", label: "Mais relevantes" },
+                { key: "maisBarato", label: "Mais barato" },
+                { key: "maisCaro", label: "Mais caro" },
+              ].map((opcao) => (
+                <TouchableOpacity
+                  key={opcao.key}
+                  style={estilos.opcaoModal}
+                  onPress={() => {
+                    setOrdenacao(opcao.key as any);
+                    setModalOrdenacaoVisivel(false);
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      color: ordenacao === opcao.key ? "#FF6B1A" : "#333",
+                      fontWeight: ordenacao === opcao.key ? "bold" : "normal",
+                    }}
+                  >
+                    {opcao.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={estilos.botaoFecharModal}
+              onPress={() => setModalOrdenacaoVisivel(false)}
             >
               <Text style={{ color: "#FFF", fontWeight: "bold" }}>Fechar</Text>
             </TouchableOpacity>
@@ -390,5 +552,40 @@ const estilos = StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
     marginTop: 20,
+  },
+  paginacaoContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 20,
+    justifyContent: "center",
+  },
+  paginaBotao: {
+    minWidth: 44,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#DDD",
+    backgroundColor: "#F5F7FA",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  paginaBotaoAtivo: {
+    borderColor: "#FF6B1A",
+    backgroundColor: "#FF6B1A",
+  },
+  textoPagina: {
+    color: "#444",
+    fontWeight: "600",
+  },
+  textoPaginaAtiva: {
+    color: "#FFF",
+    fontWeight: "700",
+  },
+  rodapeLista: {
+    marginTop: 16,
+    textAlign: "center",
+    color: "#555",
   },
 });
