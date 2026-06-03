@@ -16,7 +16,7 @@ import { API_URL } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 
 export default function BuscaProfessores() {
-  const { usuarioId } = useAuth();
+  const { usuarioId, carregandoAuth } = useAuth();
 
   // Estados de Dados
   const [professoresBanco, setProfessoresBanco] = useState<any[]>([]);
@@ -44,15 +44,18 @@ export default function BuscaProfessores() {
 
   const buscarProfessoresPagina = useCallback(
     async (page: number) => {
+      if (!usuarioId) return;
       setCarregando(true);
 
       try {
-        const resProfs = await fetch(
-          `${API_URL}/api/usuarios/professores/destaque/${usuarioId || 1}?page=${page}&limit=${PAGE_SIZE}`,
-        );
+        const url = `${API_URL}/api/usuarios/professores/destaque/${usuarioId}`;
+        console.log("[BuscaProfessores] GET:", url);
+        const resProfs = await fetch(url);
+        console.log("[BuscaProfessores] status:", resProfs.status);
 
         if (resProfs.ok) {
           const dadosProfs = await resProfs.json();
+          console.log("[BuscaProfessores] professores recebidos:", dadosProfs.length);
           const servidorRetornouTudo = page === 1 && dadosProfs.length > PAGE_SIZE;
 
           if (servidorRetornouTudo) {
@@ -95,6 +98,14 @@ export default function BuscaProfessores() {
 
   // 1. BUSCA INICIAL NO BANCO DE DADOS
   useEffect(() => {
+    if (carregandoAuth || !usuarioId) {
+      console.log("[BuscaProfessores] aguardando auth... carregandoAuth:", carregandoAuth, "usuarioId:", usuarioId);
+      return;
+    }
+    console.log("[BuscaProfessores] auth pronta, iniciando busca para usuarioId:", usuarioId);
+
+    let cancelado = false;
+
     const buscarDadosIniciais = async () => {
       setCarregando(true);
       setPaginaAtual(1);
@@ -104,24 +115,27 @@ export default function BuscaProfessores() {
       setProfessoresFiltrados([]);
 
       try {
-        // 🟢 Busca as matérias oficiais (Saberes) do Banco
         const resSaberes = await fetch(`${API_URL}/api/saberes`);
-        if (resSaberes.ok) {
+        if (!cancelado && resSaberes.ok) {
           const dadosSaberes = await resSaberes.json();
-          // Pega só os nomes e junta com a opção "Todas"
           const nomesSaberes = dadosSaberes.map((s: any) => s.nome);
           setSaberes(["Todas", ...nomesSaberes]);
         }
 
         await buscarProfessoresPagina(1);
       } catch (e) {
-        console.error("Erro ao buscar dados da tela de busca:", e);
+        if (!cancelado) console.error("Erro ao buscar dados da tela de busca:", e);
       } finally {
-        setCarregando(false);
+        if (!cancelado) setCarregando(false);
       }
     };
+
     buscarDadosIniciais();
-  }, [usuarioId, buscarProfessoresPagina]);
+
+    return () => {
+      cancelado = true;
+    };
+  }, [carregandoAuth, usuarioId, buscarProfessoresPagina]);
 
   // 2. MOTOR DE BUSCA EM TEMPO REAL
   const professoresExibicao = paginaLocalFallback
