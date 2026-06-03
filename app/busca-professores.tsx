@@ -89,6 +89,10 @@ export default function BuscaProfessores() {
     await buscarProfessoresPagina(page);
   };
 
+  const handleFecharBusca = () => {
+    router.replace("/(tabs)");
+  };
+
   // 1. BUSCA INICIAL NO BANCO DE DADOS
   useEffect(() => {
     const buscarDadosIniciais = async () => {
@@ -170,7 +174,7 @@ export default function BuscaProfessores() {
     <View style={estilos.container}>
       {/* Header */}
       <View style={estilos.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={handleFecharBusca}>
           <Ionicons name="close" size={32} color="#111" />
         </TouchableOpacity>
         <Text style={estilos.tituloPagina}>Buscar professores</Text>
