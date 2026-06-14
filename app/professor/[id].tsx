@@ -1,9 +1,8 @@
 /**
  * @file [id].tsx
  * @description Tela de Detalhes do Professor (Página de Vendas / Vitrine).
- * 🟢 ATUALIZADO: Reutilização inteligente de componentes (SectionTitle, BotaoCustomizado)
- * e implementação do novo CardAptidao para seleção dinâmica de matérias.
- * O valor da hora/aula agora é reativo e altera o Sticky Footer de acordo com a disciplina escolhida.
+ * 🟢 ATUALIZADO: Corrigido o bug do Rodapé (Sticky Footer) ficando atrás dos botões
+ * nativos do celular. Implementado o 'useSafeAreaInsets' para calcular o respiro dinâmico.
  */
 
 import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
@@ -21,9 +20,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+// 🟢 Importamos o useSafeAreaInsets para calcular o tamanho dos botões do celular
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
-// 🟢 Componentes Reutilizados (Clean Code)
 import { BotaoCustomizado } from "../../components/BotaoCustomizado";
 import CardAptidao from "../../components/CardAptidao";
 import SectionTitle from "../../components/SectionTitle";
@@ -45,6 +47,13 @@ interface Aptidao {
   saber: Saber;
 }
 
+interface Disponibilidade {
+  id: number;
+  diaSemana: string;
+  horaInicio: string;
+  horaFim: string;
+}
+
 interface ProfessorDetalhe {
   id: number;
   nome: string;
@@ -53,15 +62,19 @@ interface ProfessorDetalhe {
   notaMedia?: number;
   totalAvaliacoes?: number;
   aptidoes?: Aptidao[];
-}
-
-interface Disponibilidade {
-  id: number;
-  data: string;
-  hora: string;
+  disponibilidades?: Disponibilidade[];
 }
 
 const diasDaSemanaNome = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const mapaDiasBackend = [
+  "Domingo",
+  "Segunda",
+  "Terça",
+  "Quarta",
+  "Quinta",
+  "Sexta",
+  "Sábado",
+];
 
 // ==========================================
 // 2. COMPONENTE PRINCIPAL
@@ -70,18 +83,19 @@ export default function ProfessorDetalhes() {
   const { id } = useLocalSearchParams();
   const { usuarioId } = useAuth() as any;
 
+  // 🟢 Hook que calcula os recuos do sistema (Dynamic Safe Area)
+  const insets = useSafeAreaInsets();
+
   const [professor, setProfessor] = useState<ProfessorDetalhe | null>(null);
   const [disponibilidades, setDisponibilidades] = useState<Disponibilidade[]>(
     [],
   );
   const [carregando, setCarregando] = useState(true);
 
-  // 🟢 Novo Estado: Armazena qual matéria foi escolhida pelo aluno
   const [aptidaoSelecionada, setAptidaoSelecionada] = useState<Aptidao | null>(
     null,
   );
 
-  // Estados do Modal
   const [modalAgendamentoVisivel, setModalAgendamentoVisivel] = useState(false);
   const [dataSelecionadaStr, setDataSelecionadaStr] = useState<string>("");
   const [horaSelecionada, setHoraSelecionada] = useState<string>("");
@@ -99,18 +113,13 @@ export default function ProfessorDetalhes() {
         const dadosProf: ProfessorDetalhe = await resProf.json();
         setProfessor(dadosProf);
 
-        // 🟢 Autoseleção Inteligente: Se ele ensina matérias, já deixa a primeira selecionada por padrão
         if (dadosProf.aptidoes && dadosProf.aptidoes.length > 0) {
           setAptidaoSelecionada(dadosProf.aptidoes[0]);
         }
-      }
 
-      const resDisp = await fetch(
-        `${API_URL}/api/disponibilidades/professor/${id}`,
-      );
-      if (resDisp.ok) {
-        const dadosDisp: Disponibilidade[] = await resDisp.json();
-        setDisponibilidades(dadosDisp);
+        if (dadosProf.disponibilidades) {
+          setDisponibilidades(dadosProf.disponibilidades);
+        }
       }
     } catch (error) {
       console.error("Falha ao sincronizar dados do especialista:", error);
@@ -124,46 +133,56 @@ export default function ProfessorDetalhes() {
   }, [carregarDadosEfetivos]);
 
   // ==========================================
-  // MOTOR DE PROCESSAMENTO CRONOLÓGICO
+  // MOTOR DE PROCESSAMENTO CRONOLÓGICO INTELIGENTE
   // ==========================================
   const obterDatasDisponiveis = () => {
-    if (disponibilidades.length > 0) {
-      const datas = disponibilidades.map((d) => d.data);
-      return Array.from(new Set(datas)).sort();
-    }
-    const fallbackDias = [];
+    const diasProximos = [];
     const hoje = new Date();
-    for (let i = 1; i <= 14; i++) {
-      const proximoDia = new Date(hoje);
-      proximoDia.setDate(hoje.getDate() + i);
-      if (proximoDia.getDay() !== 0) {
-        fallbackDias.push(proximoDia.toISOString().split("T")[0]);
+
+    if (disponibilidades && disponibilidades.length > 0) {
+      for (let i = 1; i <= 14; i++) {
+        const proximoDia = new Date(hoje);
+        proximoDia.setDate(hoje.getDate() + i);
+        const nomeDiaBackend = mapaDiasBackend[proximoDia.getDay()];
+
+        if (disponibilidades.some((d) => d.diaSemana === nomeDiaBackend)) {
+          diasProximos.push(proximoDia.toISOString().split("T")[0]);
+        }
       }
+      return diasProximos;
     }
-    return fallbackDias;
+    return [];
   };
 
   const obterHorariosParaData = (dataStr: string) => {
-    if (disponibilidades.length > 0) {
-      return disponibilidades
-        .filter((d) => d.data === dataStr)
-        .map((d) => d.hora.substring(0, 5))
-        .sort();
-    }
-    return [
-      "08:00",
-      "09:00",
-      "10:00",
-      "14:00",
-      "15:00",
-      "16:00",
-      "18:00",
-      "19:00",
-    ];
+    if (!dataStr) return [];
+
+    const partes = dataStr.split("-");
+    const objData = new Date(
+      Number(partes[0]),
+      Number(partes[1]) - 1,
+      Number(partes[2]),
+    );
+    const nomeDiaBackend = mapaDiasBackend[objData.getDay()];
+
+    const configsDoDia = disponibilidades.filter(
+      (d) => d.diaSemana === nomeDiaBackend,
+    );
+
+    let slots: string[] = [];
+    configsDoDia.forEach((config) => {
+      const hInicio = parseInt(config.horaInicio.split(":")[0], 10);
+      const hFim = parseInt(config.horaFim.split(":")[0], 10);
+
+      for (let h = hInicio; h < hFim; h++) {
+        slots.push(`${String(h).padStart(2, "0")}:00`);
+      }
+    });
+
+    return Array.from(new Set(slots)).sort();
   };
 
   const solicitarAgendamento = async () => {
-    // Validação extra: Obriga a escolher uma disciplina
     if (!aptidaoSelecionada) {
       Alert.alert(
         "Atenção",
@@ -181,13 +200,11 @@ export default function ProfessorDetalhes() {
     try {
       const horaFormatada = `${horaSelecionada}:00`;
 
-      // 🟢 Opcional para o Back-end: Agora você tem o aptidaoSelecionada se quiser mandar no Payload
       const payload = {
         aluno: { id: usuarioId || 1 },
         professor: { id: professor?.id },
         data: dataSelecionadaStr,
         hora: horaFormatada,
-        // saberId: aptidaoSelecionada.saber.id // Exemplo caso o Backend peça no futuro
       };
 
       await axios.post(`${API_URL}/agendamentos`, payload);
@@ -243,9 +260,9 @@ export default function ProfessorDetalhes() {
     ? professor.notaMedia.toString().replace(".", ",")
     : "5,0";
   const totalAvaliacoes = professor.totalAvaliacoes || 0;
-  const listagemDatas = obterDatasDisponiveis();
 
-  // 🟢 Variável Dinâmica para o Sticky Footer
+  const listagemDatas = obterDatasDisponiveis();
+  const temAgenda = listagemDatas.length > 0;
   const precoRodape = aptidaoSelecionada ? aptidaoSelecionada.precoHora : 0;
 
   return (
@@ -264,7 +281,11 @@ export default function ProfessorDetalhes() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={estilos.conteudoScroll}
+        // 🟢 Adicionamos o paddingBottom do insets ao scroll para o usuário conseguir rolar até o final
+        contentContainerStyle={[
+          estilos.conteudoScroll,
+          { paddingBottom: 150 + insets.bottom },
+        ]}
       >
         <View style={estilos.perfilAutoridade}>
           <Image
@@ -293,7 +314,6 @@ export default function ProfessorDetalhes() {
           </View>
         </View>
 
-        {/* 🟢 Refatorado usando SectionTitle e CardAptidao */}
         <View style={estilos.secaoBase}>
           <SectionTitle titulo="O que eu ensino" />
           {professor.aptidoes && professor.aptidoes.length > 0 ? (
@@ -315,7 +335,6 @@ export default function ProfessorDetalhes() {
           )}
         </View>
 
-        {/* 🟢 Refatorado usando SectionTitle */}
         <View style={estilos.secaoBase}>
           <SectionTitle titulo="Sobre o especialista" />
           <Text style={estilos.textoDescritivoBio}>
@@ -325,8 +344,13 @@ export default function ProfessorDetalhes() {
         </View>
       </ScrollView>
 
-      {/* 🟢 Sticky Footer Reativo */}
-      <View style={estilos.stickyFooter}>
+      {/* 🟢 O segredo está aqui: o paddingBottom soma o valor do insets (área de botões do celular) */}
+      <View
+        style={[
+          estilos.stickyFooter,
+          { paddingBottom: Math.max(insets.bottom + 10, 20) },
+        ]}
+      >
         <View style={estilos.infoFooter}>
           <Text style={estilos.textoRodapePequeno}>
             {aptidaoSelecionada ? "Valor da aula" : "A partir de"}
@@ -336,13 +360,17 @@ export default function ProfessorDetalhes() {
           </Text>
         </View>
 
-        {/* 🟢 Refatorado usando BotaoCustomizado para manter padronização e limpar o CSS local */}
         <View style={{ width: 180 }}>
           <BotaoCustomizado
             text="Agendar"
             aoClicar={() => {
               if (!aptidaoSelecionada) {
                 Alert.alert("Atenção", "Selecione uma disciplina primeiro!");
+              } else if (!temAgenda) {
+                Alert.alert(
+                  "Aviso",
+                  "Este professor ainda não configurou horários de atendimento na plataforma.",
+                );
               } else {
                 setModalAgendamentoVisivel(true);
               }
@@ -361,7 +389,13 @@ export default function ProfessorDetalhes() {
         onRequestClose={() => setModalAgendamentoVisivel(false)}
       >
         <View style={estilos.modalFundo}>
-          <View style={estilos.modalCartao}>
+          {/* 🟢 Aplicamos o paddingBottom do insets ao modal também, para o botão "Enviar Solicitação" não colar em baixo */}
+          <View
+            style={[
+              estilos.modalCartao,
+              { paddingBottom: Math.max(insets.bottom + 20, 25) },
+            ]}
+          >
             <View style={estilos.modalCabecalho}>
               <Text style={estilos.modalTitulo}>Escolha um horário</Text>
               <TouchableOpacity
@@ -374,6 +408,7 @@ export default function ProfessorDetalhes() {
             <Text style={estilos.modalLabel}>
               Dias disponíveis mapeados no banco:
             </Text>
+
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -457,7 +492,6 @@ export default function ProfessorDetalhes() {
               </>
             )}
 
-            {/* 🟢 Refatorado usando BotaoCustomizado com controle de Load Embutido */}
             <View style={{ marginTop: 10 }}>
               <BotaoCustomizado
                 text="Enviar Solicitação"
@@ -511,7 +545,7 @@ const estilos = StyleSheet.create({
     justifyContent: "center",
   },
   tituloHeaderNav: { fontSize: 16, fontWeight: "bold", color: "#111" },
-  conteudoScroll: { padding: 20, paddingBottom: 130 }, // Ajustado respiro pro Footer
+  conteudoScroll: { padding: 20 },
 
   perfilAutoridade: { alignItems: "center", marginTop: 10, marginBottom: 20 },
   fotoPerfilDestaque: {
@@ -561,6 +595,7 @@ const estilos = StyleSheet.create({
   textoHora: { fontSize: 15, fontWeight: "600", color: "#333" },
   textoBranco: { color: "#FFF" },
 
+  // 🟢 Estilo ajustado: Removemos o paddingVertical fixo daqui porque agora ele é gerado dinamicamente no componente
   stickyFooter: {
     position: "absolute",
     bottom: 0,
@@ -570,7 +605,7 @@ const estilos = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: "#EAEAEA",
     elevation: 10,
@@ -591,7 +626,8 @@ const estilos = StyleSheet.create({
   modalCartao: {
     backgroundColor: "#FFF",
     width: "100%",
-    padding: 25,
+    paddingHorizontal: 25,
+    paddingTop: 25,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     minHeight: 400,
