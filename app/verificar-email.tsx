@@ -1,10 +1,28 @@
-import { API_URL } from "@/config/api";
-import { Colors } from "@/constants/colors";
-import { BotaoCustomizado } from "@/src/components/BotaoCustomizado";
+/**
+ * @file verificar-email.tsx
+ * @description Controlador de Interface da Tela de Verificação de E-mail (Segurança OTP).
+ * Captura o código de autenticação enviado ao e-mail do utilizador e gere a validação junto ao Back-end.
+ * Implementa feedback visual de sucesso reutilizável.
+ */
+
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { BotaoCustomizado } from "../components/BotaoCustomizado";
+import { ModalSucesso } from "../components/ModalSucesso";
+import { API_URL } from "../config/api";
+import { Colors } from "../constants/colors";
 
 export default function VerificarEmail() {
   const { email } = useLocalSearchParams<{ email: string }>();
@@ -12,13 +30,15 @@ export default function VerificarEmail() {
 
   const [digitos, setDigitos] = useState(["", "", "", "", "", ""]);
   const [carregando, setCarregando] = useState(false);
+
+  // Estados para modais de feedback
   const [modalErroVisivel, setModalErroVisivel] = useState(false);
+  const [modalSucessoVisivel, setModalSucessoVisivel] = useState(false);
   const [modalErroTexto, setModalErroTexto] = useState("");
   const [cooldown, setCooldown] = useState(60);
 
   const inputs = useRef<(TextInput | null)[]>([]);
 
-  // Contagem regressiva para reenvio
   useEffect(() => {
     if (cooldown <= 0) return;
     const timer = setTimeout(() => setCooldown((c) => c - 1), 1000);
@@ -57,7 +77,7 @@ export default function VerificarEmail() {
       });
 
       if (resposta.ok) {
-        roteador.replace("/login");
+        setModalSucessoVisivel(true);
       } else {
         let msg = "";
         try {
@@ -68,7 +88,9 @@ export default function VerificarEmail() {
         }
         setDigitos(["", "", "", "", "", ""]);
         inputs.current[0]?.focus();
-        setModalErroTexto(msg || "Código inválido ou expirado. Tente novamente.");
+        setModalErroTexto(
+          msg || "Código inválido ou expirado. Tente novamente.",
+        );
         setModalErroVisivel(true);
       }
     } catch {
@@ -97,76 +119,123 @@ export default function VerificarEmail() {
   };
 
   return (
-    <SafeAreaView style={estilos.container}>
-      <View style={estilos.cartao}>
-        <Text style={estilos.titulo}>Verifique seu e-mail</Text>
-        <Text style={estilos.subtitulo}>
-          Enviamos um código de 6 dígitos para:
-        </Text>
-        <Text style={estilos.email}>{email}</Text>
+    <SafeAreaView style={estilos.recipientePrincipal}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          contentContainerStyle={estilos.scrollContainer}
+          keyboardShouldPersistTaps="handled" // Essencial para usabilidade
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={estilos.cartao}>
+            <Text style={estilos.titulo}>Verifique seu e-mail</Text>
+            <Text style={estilos.subtitulo}>
+              Enviamos um código de 6 dígitos para:
+            </Text>
+            <Text style={estilos.email}>{email}</Text>
 
-        <View style={estilos.recipienteOtp}>
-          {digitos.map((digito, index) => (
-            <TextInput
-              key={index}
-              ref={(ref) => { inputs.current[index] = ref; }}
-              style={[estilos.caixaOtp, digito ? estilos.caixaOtpPreenchida : null]}
-              value={digito}
-              onChangeText={(valor) => atualizarDigito(index, valor)}
-              onKeyPress={({ nativeEvent }) => handleKeyPress(index, nativeEvent.key)}
-              keyboardType="number-pad"
-              maxLength={1}
-              selectTextOnFocus
+            <View style={estilos.recipienteOtp}>
+              {digitos.map((digito, index) => (
+                <TextInput
+                  key={index}
+                  ref={(ref) => {
+                    inputs.current[index] = ref;
+                  }}
+                  style={[
+                    estilos.caixaOtp,
+                    digito ? estilos.caixaOtpPreenchida : null,
+                  ]}
+                  value={digito}
+                  onChangeText={(valor) => atualizarDigito(index, valor)}
+                  onKeyPress={({ nativeEvent }) =>
+                    handleKeyPress(index, nativeEvent.key)
+                  }
+                  keyboardType="number-pad"
+                  maxLength={1}
+                  selectTextOnFocus
+                />
+              ))}
+            </View>
+
+            <BotaoCustomizado
+              text={carregando ? "Verificando..." : "Confirmar"}
+              aoClicar={verificarCodigo}
             />
-          ))}
-        </View>
 
-        <BotaoCustomizado
-          text={carregando ? "Verificando..." : "Confirmar"}
-          aoClicar={verificarCodigo}
-        />
-
-        <TouchableOpacity
-          onPress={reenviarCodigo}
-          disabled={cooldown > 0}
-          style={estilos.botaoReenviar}
-        >
-          <Text style={[estilos.textoReenviar, cooldown > 0 && estilos.textoReenviarDesabilitado]}>
-            {cooldown > 0 ? `Reenviar código em ${cooldown}s` : "Reenviar código"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-          <TouchableOpacity
-          onPress={() => roteador.back()}
-          style={estilos.botaoCancelar}
-        >
-          <Text style={estilos.textoCancelar}>Cancelar cadastro</Text>
-        </TouchableOpacity>
-      <Modal transparent visible={modalErroVisivel} animationType="fade">
-        <View style={estilos.modalOverlay}>
-          <View style={estilos.modalCard}>
-            <Text style={estilos.modalTitulo}>Erro</Text>
-            <Text style={estilos.modalTexto}>{modalErroTexto}</Text>
             <TouchableOpacity
-              style={estilos.modalBotao}
-              onPress={() => setModalErroVisivel(false)}
+              onPress={reenviarCodigo}
+              disabled={cooldown > 0}
+              style={estilos.botaoReenviar}
             >
-              <Text style={estilos.modalBotaoTexto}>Entendi</Text>
+              <Text
+                style={[
+                  estilos.textoReenviar,
+                  cooldown > 0 && estilos.textoReenviarDesabilitado,
+                ]}
+              >
+                {cooldown > 0
+                  ? `Reenviar código em ${cooldown}s`
+                  : "Reenviar código"}
+              </Text>
             </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
+
+          <TouchableOpacity
+            onPress={() => roteador.back()}
+            style={estilos.botaoCancelar}
+          >
+            <Text style={estilos.textoCancelar}>Cancelar cadastro</Text>
+          </TouchableOpacity>
+
+          {/* Modal de Sucesso Reutilizável */}
+          <ModalSucesso
+            visivel={modalSucessoVisivel}
+            titulo="Sucesso!"
+            mensagem="Sua conta foi verificada com sucesso. Seja bem-vindo!"
+            aoFechar={() => roteador.replace("/login")}
+          />
+
+          {/* Modal de Erro */}
+          <Modal transparent visible={modalErroVisivel} animationType="fade">
+            <View style={estilos.modalOverlay}>
+              <View style={estilos.modalCard}>
+                <Text style={estilos.modalTitulo}>Erro</Text>
+                <Text style={estilos.modalTexto}>{modalErroTexto}</Text>
+                <TouchableOpacity
+                  style={estilos.modalBotao}
+                  onPress={() => setModalErroVisivel(false)}
+                >
+                  <Text style={estilos.modalBotaoTexto}>Entendi</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const estilos = StyleSheet.create({
+  recipientePrincipal: {
+    backgroundColor: Colors.background,
+    flex: 1,
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
   container: {
     alignItems: "center",
     backgroundColor: Colors.background,
     flex: 1,
     justifyContent: "center",
   },
+
   cartao: {
     alignItems: "center",
     backgroundColor: Colors.card,
@@ -186,11 +255,7 @@ const estilos = StyleSheet.create({
     marginBottom: 12,
     textAlign: "center",
   },
-  subtitulo: {
-    color: Colors.text,
-    fontSize: 14,
-    textAlign: "center",
-  },
+  subtitulo: { color: Colors.text, fontSize: 14, textAlign: "center" },
   email: {
     color: Colors.secondary,
     fontWeight: "bold",
@@ -216,21 +281,14 @@ const estilos = StyleSheet.create({
     textAlign: "center",
     width: 44,
   },
-  caixaOtpPreenchida: {
-    borderColor: Colors.secondary,
-  },
-  botaoReenviar: {
-    marginTop: 20,
-    paddingVertical: 8,
-  },
+  caixaOtpPreenchida: { borderColor: Colors.secondary },
+  botaoReenviar: { marginTop: 20, paddingVertical: 8 },
   textoReenviar: {
     color: Colors.secondary,
     fontWeight: "bold",
     textAlign: "center",
   },
-  textoReenviarDesabilitado: {
-    color: "#AAAAAA",
-  },
+  textoReenviarDesabilitado: { color: "#AAAAAA" },
   modalOverlay: {
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.25)",
@@ -268,17 +326,7 @@ const estilos = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
   },
-  modalBotaoTexto: {
-    color: "white",
-    fontWeight: "bold",
-  },
-  botaoCancelar: {
-    marginTop: 12,
-    paddingVertical: 8,
-  },
-  textoCancelar: {
-    color: "#CC4444",
-    fontWeight: "bold",
-    textAlign: "center",
-  },
+  modalBotaoTexto: { color: "white", fontWeight: "bold" },
+  botaoCancelar: { marginTop: 12, paddingVertical: 8 },
+  textoCancelar: { color: "#CC4444", fontWeight: "bold", textAlign: "center" },
 });
