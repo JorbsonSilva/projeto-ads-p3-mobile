@@ -1,10 +1,13 @@
 import { Colors } from '@/constants/colors';
+import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 
 export default function SplashScreen() {
   const router = useRouter();
+  const { usuarioId, carregandoAuth } = useAuth();
+  const [animacaoConcluida, setAnimacaoConcluida] = useState(false);
 
   // Valores para a animação
   const opacidade = useRef(new Animated.Value(0)).current;
@@ -26,12 +29,22 @@ export default function SplashScreen() {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      // Navega para o login após a animação
       setTimeout(() => {
-        router.push('/login');
+        setAnimacaoConcluida(true);
       }, 3500);
     });
-  }, []);
+  }, [escala, opacidade]);
+
+  // Navega somente quando a animação terminar E a sessão tiver sido carregada
+  useEffect(() => {
+    if (!animacaoConcluida || carregandoAuth) return;
+
+    if (usuarioId) {
+      router.replace('/(tabs)');
+    } else {
+      router.replace('/login');
+    }
+  }, [animacaoConcluida, carregandoAuth, usuarioId, router]);
 
   return (
     <View style={style.container}>
