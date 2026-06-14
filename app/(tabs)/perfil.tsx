@@ -1,7 +1,10 @@
-import { API_URL } from "@/config/api";
-import { Colors } from "@/constants/colors";
-import { useAuth } from "@/context/AuthContext"; // 🟢 1. IMPORTAÇÃO DO CONTEXTO GLOBAL
-import { FontAwesome5, MaterialIcons } from "@expo/vector-icons";
+/**
+ * @file perfil.tsx
+ * @description Controlador da Tela de Perfil do Usuário.
+ * Permite ao usuário visualizar e editar suas informações pessoais, segurança,
+ */
+
+import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -20,6 +23,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { BotaoCustomizado } from "../../components/BotaoCustomizado";
+import { InputCustomizado } from "../../components/InputCustomizado";
+import { API_URL } from "../../config/api";
+import { useAuth } from "../../context/AuthContext";
+
 const diasDaSemanaDisponiveis = [
   "Segunda",
   "Terça",
@@ -30,16 +38,31 @@ const diasDaSemanaDisponiveis = [
   "Domingo",
 ];
 
+const HORARIOS_LISTA = [
+  "06:00",
+  "07:00",
+  "08:00",
+  "09:00",
+  "10:00",
+  "11:00",
+  "12:00",
+  "13:00",
+  "14:00",
+  "15:00",
+  "16:00",
+  "17:00",
+  "18:00",
+  "19:00",
+  "20:00",
+  "21:00",
+  "22:00",
+];
+
 export default function PerfilPeca1() {
   const roteador = useRouter();
   const URL_BACKEND = `${API_URL}`;
 
-  // ==========================================
-  // 1. ESTADOS DO COMPONENTE
-  // ==========================================
   const [carregando, setCarregando] = useState(true);
-
-  // 🟢 2. ESTADO DO CHAVEADOR AGORA VEM DO CONTEXTO GLOBAL
   const {
     perfilAtivo,
     alternarPerfilGlobal,
@@ -48,46 +71,53 @@ export default function PerfilPeca1() {
     logoutGlobal,
   } = useAuth() as any;
 
+  // Estados Pessoais
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [nascimento, setNascimento] = useState("");
   const [cpf, setCpf] = useState("");
+  const [salvandoPessoal, setSalvandoPessoal] = useState(false);
 
+  // Estados de Segurança
   const [senhaAtual, setSenhaAtual] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
+  const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [salvandoSenha, setSalvandoSenha] = useState(false);
   const [mostrarConfirmLogout, setMostrarConfirmLogout] = useState(false);
 
+  // Controles de Acordeão
   const [expandirInfo, setExpandirInfo] = useState(false);
   const [expandirSeguranca, setExpandirSeguranca] = useState(false);
 
-  // ==========================================
-  // ESTADOS DA PEÇA 2 (Área do Aluno)
-  // ==========================================
+  // Estados do Aluno
   const [bioAluno, setBioAluno] = useState("");
   const [buscaSaber, setBuscaSaber] = useState("");
   const [catalogoSaberesBD, setCatalogoSaberesBD] = useState<any[]>([]);
   const [interesses, setInteresses] = useState<any[]>([]);
+  const [salvandoAluno, setSalvandoAluno] = useState(false);
 
-  // ==========================================
-  // ESTADOS DA PEÇA 3 (Área do Professor)
-  // ==========================================
+  // Estados do Professor
   const [bioProfessor, setBioProfessor] = useState("");
   const [aptidoes, setAptidoes] = useState<any[]>([]);
-
   const [buscaSaberProf, setBuscaSaberProf] = useState("");
   const [saberProfSelecionado, setSaberProfSelecionado] = useState<any>(null);
   const [nivelProf, setNivelProf] = useState("Iniciante");
   const [precoProf, setPrecoProf] = useState("");
 
-  // 🟢 NOVOS ESTADOS PARA A DISPONIBILIDADE DE HORÁRIOS DO PROFESSOR
+  // Estados de Controle de Disponibilidade
   const [disponibilidades, setDisponibilidades] = useState<any[]>([]);
   const [diaSelecionado, setDiaSelecionado] = useState("Segunda");
   const [horaInicio, setHoraInicio] = useState("");
   const [horaFim, setHoraFim] = useState("");
+  const [salvandoProf, setSalvandoProf] = useState(false);
+
+  // Modal de Seleção de Horário
+  const [modalHorarioVisivel, setModalHorarioVisivel] = useState(false);
+  const [tipoHorario, setTipoHorario] = useState<"inicio" | "fim">("inicio");
 
   // ==========================================
-  // 2. CICLO DE VIDA (Busca e Inicialização)
+  // CICLO DE VIDA E DADOS
   // ==========================================
   useEffect(() => {
     if (carregandoAuth) return;
@@ -99,26 +129,21 @@ export default function PerfilPeca1() {
           `${URL_BACKEND}/api/usuarios/${usuarioId}`,
         );
         if (resposta.ok) {
-          const dadosUsuario = await resposta.json();
-          setNome(dadosUsuario.nome || "");
-          setEmail(dadosUsuario.email || "");
-          setNascimento(dadosUsuario.dataNascimento || "");
-          setCpf(dadosUsuario.cpf || "");
-
-          setBioAluno(dadosUsuario.bioAluno || "");
-          setInteresses(dadosUsuario.interesses || []);
-
-          setBioProfessor(dadosUsuario.bioProfessor || "");
-          setAptidoes(dadosUsuario.aptidoes || []);
-
-          // 🟢 Puxa as disponibilidades salvas no banco
-          setDisponibilidades(dadosUsuario.disponibilidades || []);
+          const dados = await resposta.json();
+          setNome(dados.nome || "");
+          setEmail(dados.email || "");
+          setNascimento(dados.dataNascimento || "");
+          setCpf(dados.cpf || "");
+          setBioAluno(dados.bioAluno || "");
+          setInteresses(dados.interesses || []);
+          setBioProfessor(dados.bioProfessor || "");
+          setAptidoes(dados.aptidoes || []);
+          setDisponibilidades(dados.disponibilidades || []);
         }
 
-        const respostaSaberes = await fetch(`${URL_BACKEND}/api/saberes`);
-        if (respostaSaberes.ok) {
-          const dadosSaberes = await respostaSaberes.json();
-          setCatalogoSaberesBD(dadosSaberes);
+        const resSaberes = await fetch(`${URL_BACKEND}/api/saberes`);
+        if (resSaberes.ok) {
+          setCatalogoSaberesBD(await resSaberes.json());
         }
       } catch (error) {
         console.error("Erro ao inicializar:", error);
@@ -130,54 +155,27 @@ export default function PerfilPeca1() {
   }, [carregandoAuth, usuarioId]);
 
   // ==========================================
-  // 3. REGRAS DE NEGÓCIO
+  // REGRAS DE NEGÓCIO E FUNÇÕES
   // ==========================================
-  const alternarPerfil = async (novoPerfil: string) => {
-    // 🟢 Chama a função do AuthContext para alterar o App inteiro
-    if (alternarPerfilGlobal) {
-      alternarPerfilGlobal(novoPerfil);
-    } else {
-      Alert.alert("Erro", "Contexto global de perfil não encontrado.");
-    }
-  };
-
   const handleLogout = async () => {
     try {
-      // 🟢 Limpa a Memória RAM e o Disco Rígido com apenas um comando!
-      if (logoutGlobal) {
-        await logoutGlobal();
-      } else {
+      if (logoutGlobal) await logoutGlobal();
+      else
         await AsyncStorage.multiRemove([
           "@orienta_perfil",
           "@orienta_usuario_id",
         ]);
-      }
     } catch (error) {
-      console.error("Erro ao limpar storage:", error);
+      console.error("Erro no logout:", error);
     } finally {
       roteador.replace("/login");
     }
   };
 
-  const deslogarSistema = () => {
-    setMostrarConfirmLogout(true);
-  };
-
-  const confirmarLogout = async () => {
-    setMostrarConfirmLogout(false);
-    await handleLogout();
-  };
-
-  const cancelarLogout = () => {
-    setMostrarConfirmLogout(false);
-  };
-
   const atualizarDadosPessoais = async () => {
     if (!nome)
-      return Alert.alert(
-        "Erro",
-        "O campo Nome Completo não pode ficar em branco.",
-      );
+      return Alert.alert("Erro", "O campo Nome Completo é obrigatório.");
+    setSalvandoPessoal(true);
     try {
       const resposta = await fetch(`${URL_BACKEND}/api/usuarios/${usuarioId}`, {
         method: "PUT",
@@ -185,17 +183,26 @@ export default function PerfilPeca1() {
         body: JSON.stringify({ nome, dataNascimento: nascimento, cpf }),
       });
       if (resposta.ok) {
-        Alert.alert("Sucesso", "Dados atualizados!");
+        Alert.alert("Sucesso", "Seus dados pessoais foram atualizados.");
         setExpandirInfo(false);
       }
     } catch (error) {
-      Alert.alert("Erro", "Falha de conexão.");
+      Alert.alert("Erro", "Falha de conexão com o servidor.");
+    } finally {
+      setSalvandoPessoal(false);
     }
   };
 
   const processarTrocaSenha = async () => {
     if (!senhaAtual || !novaSenha || !confirmarSenha)
-      return Alert.alert("Atenção", "Preencha tudo.");
+      return Alert.alert("Atenção", "Preencha todas as senhas.");
+    if (novaSenha !== confirmarSenha)
+      return Alert.alert(
+        "Atenção",
+        "A nova senha e a confirmação não coincidem.",
+      );
+
+    setSalvandoSenha(true);
     try {
       const resposta = await fetch(
         `${URL_BACKEND}/api/usuarios/${usuarioId}/senha`,
@@ -206,141 +213,143 @@ export default function PerfilPeca1() {
         },
       );
       if (resposta.ok) {
-        Alert.alert("Sucesso", "Senha alterada.");
+        Alert.alert("Sucesso", "Sua senha foi alterada com segurança.");
         setSenhaAtual("");
         setNovaSenha("");
         setConfirmarSenha("");
         setExpandirSeguranca(false);
+      } else {
+        Alert.alert("Erro", "Senha atual incorreta.");
       }
     } catch (error) {
-      Alert.alert("Erro", "Falha na troca.");
+      Alert.alert("Erro", "Falha na troca de senha.");
+    } finally {
+      setSalvandoSenha(false);
     }
-  };
-
-  // ==========================================
-  // LÓGICA DA PEÇA 2: INTERESSES (ALUNO)
-  // ==========================================
-  const saberesFiltrados =
-    buscaSaber.length > 0
-      ? catalogoSaberesBD.filter((saber) =>
-          saber.nome.toLowerCase().includes(buscaSaber.toLowerCase()),
-        )
-      : [];
-
-  const adicionarInteresse = (saberSelecionado: any) => {
-    if (
-      interesses.some(
-        (item) =>
-          item.saber?.id === saberSelecionado.id ||
-          item.id === saberSelecionado.id,
-      )
-    ) {
-      return Alert.alert("Aviso", "Você já adicionou esta matéria.");
-    }
-    setInteresses([...interesses, { saber: saberSelecionado }]);
-    setBuscaSaber("");
-  };
-
-  const removerInteresse = (saberIdParaRemover: number) => {
-    setInteresses(
-      interesses.filter(
-        (item) =>
-          item.saber?.id !== saberIdParaRemover &&
-          item.id !== saberIdParaRemover,
-      ),
-    );
   };
 
   const salvarPerfilAluno = async () => {
+    setSalvandoAluno(true);
     try {
-      const resposta = await fetch(
-        `${URL_BACKEND}/api/usuarios/${usuarioId}/aluno`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            bio: bioAluno,
-            interessesIds: interesses.map((item) => item.saber?.id || item.id),
-          }),
-        },
-      );
-
-      if (resposta.ok) {
-        Alert.alert("Sucesso", "Seu perfil de Aluno foi salvo com sucesso!");
-      } else {
-        const erroMsg = await resposta.text();
-        Alert.alert(
-          "Erro",
-          erroMsg || "Falha ao sincronizar o perfil de aluno no servidor.",
-        );
-      }
+      await fetch(`${URL_BACKEND}/api/usuarios/${usuarioId}/aluno`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bio: bioAluno,
+          interessesIds: interesses.map((item) => item.saber?.id || item.id),
+        }),
+      });
+      Alert.alert("Sucesso", "Seu perfil de Aluno foi atualizado!");
     } catch (error) {
-      Alert.alert("Erro", "Falha de conexão com o banco de dados.");
+      Alert.alert("Erro", "Falha de conexão.");
+    } finally {
+      setSalvandoAluno(false);
     }
   };
 
-  // ==========================================
-  // LÓGICA DA PEÇA 3: APTIDÕES E DISPONIBILIDADE (PROFESSOR)
-  // ==========================================
-  const saberesProfFiltrados =
-    buscaSaberProf.length > 0
-      ? catalogoSaberesBD.filter((saber) =>
-          saber.nome.toLowerCase().includes(buscaSaberProf.toLowerCase()),
-        )
-      : [];
-
-  const prepararAptidao = (saberSelecionado: any) => {
-    if (
-      aptidoes.some(
-        (item) => (item.saber?.id || item.saberId) === saberSelecionado.id,
-      )
-    ) {
-      return Alert.alert("Aviso", "Você já ensina esta matéria.");
+  const salvarPerfilProfessor = async () => {
+    setSalvandoProf(true);
+    try {
+      const aptidoesMapeadas = aptidoes.map((apt) => ({
+        saberId: apt.saber?.id || apt.saberId,
+        nivelDominio: apt.nivelDominio,
+        precoHora: apt.precoHora,
+      }));
+      await fetch(`${URL_BACKEND}/api/usuarios/${usuarioId}/professor`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bio: bioProfessor,
+          aptidoesNova: aptidoesMapeadas,
+          disponibilidadesNova: disponibilidades,
+        }),
+      });
+      Alert.alert("Sucesso", "Perfil de Professor atualizado com sucesso!");
+    } catch (error) {
+      Alert.alert("Erro", "Falha de conexão.");
+    } finally {
+      setSalvandoProf(false);
     }
-    setSaberProfSelecionado(saberSelecionado);
+  };
+
+  const adicionarInteresse = (saber: any) => {
+    if (interesses.some((item) => (item.saber?.id || item.id) === saber.id))
+      return;
+    setInteresses([...interesses, { saber }]);
+    setBuscaSaber("");
+  };
+  const removerInteresse = (id: number) =>
+    setInteresses(
+      interesses.filter((item) => (item.saber?.id || item.id) !== id),
+    );
+
+  const prepararAptidao = (saber: any) => {
+    if (aptidoes.some((item) => (item.saber?.id || item.saberId) === saber.id))
+      return Alert.alert("Aviso", "Matéria já adicionada.");
+    setSaberProfSelecionado(saber);
     setBuscaSaberProf("");
   };
 
-  const confirmarAdicaoAptidao = () => {
-    if (!precoProf) return Alert.alert("Aviso", "Defina o valor da hora/aula.");
-
-    const novaApt = {
-      saberId: saberProfSelecionado.id,
-      nomeExibicao: saberProfSelecionado.nome,
-      nivelDominio: nivelProf,
-      precoHora: parseFloat(precoProf.replace(",", ".")) || 0,
-    };
-
-    setAptidoes([...aptidoes, novaApt]);
+  const cancelarAdicaoAptidao = () => {
     setSaberProfSelecionado(null);
     setPrecoProf("");
     setNivelProf("Iniciante");
   };
 
-  const removerAptidao = (saberIdParaRemover: number) => {
-    setAptidoes(
-      aptidoes.filter(
-        (item) => (item.saber?.id || item.saberId) !== saberIdParaRemover,
-      ),
-    );
+  const confirmarAdicaoAptidao = () => {
+    if (!precoProf) return Alert.alert("Aviso", "Defina o valor da hora/aula.");
+    setAptidoes([
+      ...aptidoes,
+      {
+        saberId: saberProfSelecionado.id,
+        nomeExibicao: saberProfSelecionado.nome,
+        nivelDominio: nivelProf,
+        precoHora: parseFloat(precoProf.replace(",", ".")) || 0,
+      },
+    ]);
+    setSaberProfSelecionado(null);
+    setPrecoProf("");
+    setNivelProf("Iniciante");
   };
 
-  // 🟢 FUNÇÕES PARA ADICIONAR HORÁRIOS
-  const adicionarDisponibilidade = () => {
-    if (!horaInicio || !horaFim) {
-      return Alert.alert("Aviso", "Preencha o horário de início e fim.");
+  const removerAptidao = (id: number) =>
+    setAptidoes(
+      aptidoes.filter((item) => (item.saber?.id || item.saberId) !== id),
+    );
+
+  const processarSelecaoHorario = (hora: string) => {
+    if (tipoHorario === "inicio") {
+      setHoraInicio(hora);
+      if (!horaFim || hora >= horaFim) {
+        const index = HORARIOS_LISTA.indexOf(hora);
+        if (index !== -1 && index < HORARIOS_LISTA.length - 1) {
+          setHoraFim(HORARIOS_LISTA[index + 1]);
+        }
+      }
+    } else {
+      if (horaInicio && hora <= horaInicio) {
+        Alert.alert(
+          "Aviso",
+          "O horário de término deve ser posterior ao início.",
+        );
+        return;
+      }
+      setHoraFim(hora);
     }
+    setModalHorarioVisivel(false);
+  };
 
-    // Tratamento simples para garantir o formato HH:MM:SS exigido pelo Java LocalTime
-    const inicio = horaInicio.includes(":") ? horaInicio : `${horaInicio}:00`;
-    const fim = horaFim.includes(":") ? horaFim : `${horaFim}:00`;
-
-    const novaDisp = {
-      diaSemana: diaSelecionado,
-      horaInicio: inicio,
-      horaFim: fim,
-    };
-    setDisponibilidades([...disponibilidades, novaDisp]);
+  const adicionarDisponibilidade = () => {
+    if (!horaInicio || !horaFim)
+      return Alert.alert("Aviso", "Preencha o intervalo de início e fim.");
+    setDisponibilidades([
+      ...disponibilidades,
+      {
+        diaSemana: diaSelecionado,
+        horaInicio: `${horaInicio}:00`,
+        horaFim: `${horaFim}:00`,
+      },
+    ]);
     setHoraInicio("");
     setHoraFim("");
   };
@@ -351,450 +360,365 @@ export default function PerfilPeca1() {
     setDisponibilidades(novaLista);
   };
 
-  const salvarPerfilProfessor = async () => {
-    try {
-      const aptidoesMapeadas = aptidoes.map((apt) => ({
-        saberId: apt.saber?.id || apt.saberId,
-        nivelDominio: apt.nivelDominio,
-        precoHora: apt.precoHora,
-      }));
-
-      const resposta = await fetch(
-        `${URL_BACKEND}/api/usuarios/${usuarioId}/professor`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            bio: bioProfessor,
-            aptidoesNova: aptidoesMapeadas,
-            disponibilidadesNova: disponibilidades, // 🟢 Enviamos os horários para o back-end
-          }),
-        },
-      );
-
-      if (resposta.ok) {
-        Alert.alert("Sucesso", "Perfil de Professor atualizado com sucesso!");
-      } else {
-        Alert.alert("Erro", "Falha ao sincronizar o perfil no servidor.");
-      }
-    } catch (error) {
-      Alert.alert("Erro", "Falha de conexão com o banco de dados.");
-    }
-  };
-
   // ==========================================
-  // 4. RENDERIZAÇÃO
+  // RENDERIZAÇÃO DA INTERFACE (UI)
   // ==========================================
   if (carregando) {
     return (
-      <SafeAreaView
-        style={[
-          estilos.telaSegura,
-          { justifyContent: "center", alignItems: "center" },
-        ]}
-      >
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </SafeAreaView>
+      <View style={estilos.telaCarregamento}>
+        <ActivityIndicator size="large" color="#FF6B1A" />
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={estilos.telaSegura}>
+    <SafeAreaView style={estilos.telaGeral} edges={["top"]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
+        <View style={estilos.headerNav}>
+          <Text style={estilos.tituloHeader}>Gestão de Conta</Text>
+          <TouchableOpacity
+            onPress={() => setMostrarConfirmLogout(true)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Feather name="log-out" size={24} color="#D93838" />
+          </TouchableOpacity>
+        </View>
+
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={estilos.conteudoTela}
-          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={estilos.conteudoScroll}
         >
-          {/* CABEÇALHO */}
-          <View style={estilos.cabecalho}>
-            <TouchableOpacity onPress={() => roteador.back()}>
-              <MaterialIcons name="arrow-back" size={24} color={Colors.text} />
-            </TouchableOpacity>
-            <Text style={estilos.tituloCabecalho}>Meu Perfil</Text>
-            <TouchableOpacity
-              onPress={deslogarSistema}
-              style={estilos.botaoLogout}
-            >
-              <MaterialIcons name="logout" size={24} color="#E74C3C" />
-            </TouchableOpacity>
-          </View>
-
-          {/* AVATAR E NOME */}
-          <View style={estilos.containerAvatar}>
-            <View style={estilos.avatarNeumorfico}>
-              <Text style={estilos.letraAvatar}>
-                {nome ? nome.charAt(0).toUpperCase() : "U"}
-              </Text>
+          <View style={estilos.containerIdentidade}>
+            <View style={estilos.avatarContainer}>
+              <View style={estilos.avatarCirculo}>
+                <Text style={estilos.avatarLetra}>
+                  {nome ? nome.charAt(0).toUpperCase() : "U"}
+                </Text>
+              </View>
+              <View style={estilos.iconeEdicaoFoto}>
+                <Feather name="camera" size={14} color="#FFF" />
+              </View>
             </View>
-            <Text style={estilos.nomeExibicao}>{nome || "Usuário"}</Text>
+            <Text style={estilos.nomeDestaque}>{nome || "Usuário"}</Text>
+            <Text style={estilos.emailDestaque}>{email}</Text>
           </View>
 
           {/* ACORDEÃO 1: INFORMAÇÕES PESSOAIS */}
-          <View style={estilos.blocoFormulario}>
+          <View style={estilos.cartaoAcordeao}>
             <TouchableOpacity
               style={estilos.cabecalhoAcordeao}
               onPress={() => setExpandirInfo(!expandirInfo)}
             >
-              <Text style={estilos.tituloSessao}>Informações Pessoais</Text>
-              <MaterialIcons
-                name={
-                  expandirInfo ? "keyboard-arrow-up" : "keyboard-arrow-down"
-                }
-                size={28}
-                color={Colors.secondary}
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+              >
+                <Feather name="user" size={20} color="#0057B8" />
+                <Text style={estilos.tituloSessao}>Informações Pessoais</Text>
+              </View>
+              <Feather
+                name={expandirInfo ? "chevron-up" : "chevron-down"}
+                size={22}
+                color="#999"
               />
             </TouchableOpacity>
+
             {expandirInfo && (
               <View style={estilos.conteudoAcordeao}>
-                <View style={[estilos.inputNeumorfico, estilos.inputBloqueado]}>
-                  <TextInput
-                    value={email}
-                    editable={false}
-                    style={estilos.textoInputBloqueado}
-                  />
-                  <MaterialIcons name="lock" size={18} color="#A6ACAF" />
+                <Text style={estilos.labelInput}>
+                  E-mail de Cadastro (Bloqueado)
+                </Text>
+                <View style={estilos.inputBloqueadoContainer}>
+                  <Text style={estilos.textoInputBloqueado}>{email}</Text>
+                  <Feather name="lock" size={16} color="#999" />
                 </View>
-                <View style={estilos.inputNeumorfico}>
-                  <TextInput
-                    value={nome}
-                    onChangeText={setNome}
-                    style={estilos.textoInput}
-                    placeholder="Nome Completo"
-                  />
+
+                <Text style={estilos.labelInput}>Nome Completo</Text>
+                <InputCustomizado
+                  placeholder="Seu nome"
+                  valor={nome}
+                  aoMudarTexto={setNome}
+                />
+
+                <View style={{ flexDirection: "row", gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={estilos.labelInput}>CPF</Text>
+                    <InputCustomizado
+                      placeholder="000.000.000-00"
+                      valor={cpf}
+                      aoMudarTexto={setCpf}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={estilos.labelInput}>Nascimento</Text>
+                    <InputCustomizado
+                      placeholder="DD/MM/AAAA"
+                      valor={nascimento}
+                      aoMudarTexto={setNascimento}
+                    />
+                  </View>
                 </View>
-                <View style={estilos.inputNeumorfico}>
-                  <TextInput
-                    value={cpf}
-                    onChangeText={setCpf}
-                    keyboardType="numeric"
-                    style={estilos.textoInput}
-                    placeholder="CPF"
-                    maxLength={14}
-                  />
-                  <FontAwesome5
-                    name="id-card"
-                    size={16}
-                    color={Colors.secondary}
-                  />
-                </View>
-                <View style={estilos.inputNeumorfico}>
-                  <TextInput
-                    value={nascimento}
-                    onChangeText={setNascimento}
-                    style={estilos.textoInput}
-                    placeholder="Nascimento"
-                    maxLength={10}
-                  />
-                  <FontAwesome5
-                    name="calendar-alt"
-                    size={16}
-                    color={Colors.secondary}
-                  />
-                </View>
-                <TouchableOpacity
-                  style={estilos.botaoSalvarSeccional}
-                  onPress={atualizarDadosPessoais}
-                >
-                  <Text style={estilos.textoBotaoSeccional}>Salvar</Text>
-                </TouchableOpacity>
+
+                <BotaoCustomizado
+                  text="Atualizar Dados"
+                  aoClicar={atualizarDadosPessoais}
+                  carregando={salvandoPessoal}
+                />
               </View>
             )}
           </View>
 
-          <View style={estilos.divisorVisual} />
-
           {/* ACORDEÃO 2: SEGURANÇA */}
-          <View style={estilos.blocoFormulario}>
+          <View style={estilos.cartaoAcordeao}>
             <TouchableOpacity
               style={estilos.cabecalhoAcordeao}
               onPress={() => setExpandirSeguranca(!expandirSeguranca)}
             >
-              <Text style={estilos.tituloSessao}>Segurança e Acesso</Text>
-              <MaterialIcons
-                name={
-                  expandirSeguranca
-                    ? "keyboard-arrow-up"
-                    : "keyboard-arrow-down"
-                }
-                size={28}
-                color={Colors.secondary}
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+              >
+                <Feather name="shield" size={20} color="#D35400" />
+                <Text style={estilos.tituloSessao}>Segurança e Acesso</Text>
+              </View>
+              <Feather
+                name={expandirSeguranca ? "chevron-up" : "chevron-down"}
+                size={22}
+                color="#999"
               />
             </TouchableOpacity>
+
             {expandirSeguranca && (
               <View style={estilos.conteudoAcordeao}>
-                <View style={estilos.inputNeumorfico}>
-                  <TextInput
-                    value={senhaAtual}
-                    onChangeText={setSenhaAtual}
-                    secureTextEntry
-                    style={estilos.textoInput}
-                    placeholder="Senha Atual"
-                  />
-                </View>
-                <View style={estilos.inputNeumorfico}>
-                  <TextInput
-                    value={novaSenha}
-                    onChangeText={setNovaSenha}
-                    secureTextEntry
-                    style={estilos.textoInput}
-                    placeholder="Nova Senha"
-                  />
-                </View>
-                <View style={estilos.inputNeumorfico}>
-                  <TextInput
-                    value={confirmarSenha}
-                    onChangeText={setConfirmarSenha}
-                    secureTextEntry
-                    style={estilos.textoInput}
-                    placeholder="Confirmar"
-                  />
-                </View>
-                <TouchableOpacity
-                  style={estilos.botaoMudarSenha}
-                  onPress={processarTrocaSenha}
-                >
-                  <Text style={estilos.textoMudarSenha}>Mudar Senha</Text>
-                </TouchableOpacity>
+                <Text style={estilos.labelInput}>Senha Atual</Text>
+                <InputCustomizado
+                  placeholder="Digite sua senha atual"
+                  valor={senhaAtual}
+                  aoMudarTexto={setSenhaAtual}
+                  seguro
+                  mostrarSenha={mostrarSenha}
+                  aoAlternarSenha={() => setMostrarSenha(!mostrarSenha)}
+                />
+                <Text style={estilos.labelInput}>Nova Senha</Text>
+                <InputCustomizado
+                  placeholder="Digite a nova senha"
+                  valor={novaSenha}
+                  aoMudarTexto={setNovaSenha}
+                  seguro
+                  mostrarSenha={mostrarSenha}
+                  aoAlternarSenha={() => setMostrarSenha(!mostrarSenha)}
+                />
+                <Text style={estilos.labelInput}>Confirme a Nova Senha</Text>
+                <InputCustomizado
+                  placeholder="Repita a nova senha"
+                  valor={confirmarSenha}
+                  aoMudarTexto={setConfirmarSenha}
+                  seguro
+                  mostrarSenha={mostrarSenha}
+                  aoAlternarSenha={() => setMostrarSenha(!mostrarSenha)}
+                />
+
+                <BotaoCustomizado
+                  text="Alterar Senha"
+                  aoClicar={processarTrocaSenha}
+                  carregando={salvandoSenha}
+                />
               </View>
             )}
           </View>
 
-          {/* ========================================== */}
-          {/* CHAVEADOR DE PERFIL (ALUNO/PROF)           */}
-          {/* ========================================== */}
-          <View style={estilos.containerSelector}>
+          {/* SEGMENTED CONTROL: Chaveador Premium Aluno/Professor */}
+          <View style={estilos.segmentedControl}>
             <TouchableOpacity
               style={[
-                estilos.botaoSelector,
-                perfilAtivo === "Aluno" && estilos.botaoSelectorAtivo,
+                estilos.segmentTab,
+                perfilAtivo === "Aluno" && estilos.segmentTabAtiva,
               ]}
-              onPress={() => alternarPerfil("Aluno")}
+              onPress={() => alternarPerfilGlobal("Aluno")}
             >
               <Text
                 style={[
-                  estilos.textoSelector,
-                  perfilAtivo === "Aluno" && estilos.textoSelectorAtivo,
+                  estilos.segmentTexto,
+                  perfilAtivo === "Aluno" && estilos.segmentTextoAtivo,
                 ]}
               >
-                Config. Aluno
+                Área do Aluno
               </Text>
             </TouchableOpacity>
-
             <TouchableOpacity
               style={[
-                estilos.botaoSelector,
-                perfilAtivo === "Professor" && estilos.botaoSelectorAtivo,
+                estilos.segmentTab,
+                perfilAtivo === "Professor" && estilos.segmentTabAtiva,
               ]}
-              onPress={() => alternarPerfil("Professor")}
+              onPress={() => alternarPerfilGlobal("Professor")}
             >
               <Text
                 style={[
-                  estilos.textoSelector,
-                  perfilAtivo === "Professor" && estilos.textoSelectorAtivo,
+                  estilos.segmentTexto,
+                  perfilAtivo === "Professor" && estilos.segmentTextoAtivo,
                 ]}
               >
-                Config. Professor
+                Área do Professor
               </Text>
             </TouchableOpacity>
           </View>
 
           {/* ========================================== */}
-          {/* RENDERIZAÇÃO CONDICIONAL DAS PEÇAS 2 E 3   */}
+          {/* PEÇA 2: CONFIGURAÇÕES DO ALUNO             */}
           {/* ========================================== */}
-
-          {perfilAtivo === "Aluno" ? (
-            <View style={estilos.blocoEspecifico}>
-              <Text style={[estilos.tituloSessao, { alignSelf: "flex-start" }]}>
-                Sua Apresentação (Bio)
+          {perfilAtivo === "Aluno" && (
+            <View style={estilos.blocoConfiguracoes}>
+              <Text style={estilos.tituloConfig}>
+                Apresentação Pública (Bio)
+              </Text>
+              <Text style={estilos.subtituloConfig}>
+                Escreva sobre seus objetivos de estudo e o que busca nos
+                mentores.
               </Text>
 
-              <View
-                style={[
-                  estilos.inputNeumorfico,
-                  {
-                    height: 100,
-                    alignItems: "flex-start",
-                    paddingVertical: 10,
-                    width: "100%",
-                  },
-                ]}
-              >
+              <View style={estilos.textAreaContainer}>
                 <TextInput
                   value={bioAluno}
                   onChangeText={setBioAluno}
                   multiline
-                  style={[estilos.textoInput, { textAlignVertical: "top" }]}
-                  placeholder="Fale um pouco sobre seus objetivos de estudo..."
-                  placeholderTextColor="#A6ACAF"
+                  style={estilos.textArea}
+                  placeholder="Ex: Sou estudante de exatas buscando ajuda em cálculo..."
                 />
               </View>
 
-              <Text
-                style={[
-                  estilos.tituloSessao,
-                  { marginTop: 10, alignSelf: "flex-start" },
-                ]}
-              >
-                O que você quer aprender?
+              <Text style={[estilos.tituloConfig, { marginTop: 24 }]}>
+                Disciplinas de Interesse
               </Text>
-
-              {/* Barra de Pesquisa */}
-              <View style={[estilos.inputNeumorfico, { width: "100%" }]}>
-                <MaterialIcons
-                  name="search"
-                  size={20}
-                  color={Colors.secondary}
-                  style={{ marginRight: 10 }}
-                />
+              <View style={estilos.buscaContainer}>
+                <Feather name="search" size={20} color="#999" />
                 <TextInput
                   value={buscaSaber}
                   onChangeText={setBuscaSaber}
-                  style={estilos.textoInput}
-                  placeholder="Pesquise uma matéria (ex: Java)..."
-                  placeholderTextColor="#A6ACAF"
+                  style={estilos.inputBuscaAptidao}
+                  placeholder="Pesquise para adicionar..."
                 />
               </View>
 
-              {/* Caixa Suspensa de Resultados */}
-              {saberesFiltrados.length > 0 && (
-                <View style={estilos.caixaResultados}>
-                  {saberesFiltrados.map((saber, i) => (
-                    <TouchableOpacity
-                      key={i}
-                      style={estilos.itemResultado}
-                      onPress={() => adicionarInteresse(saber)}
-                    >
-                      <Text style={estilos.textoResultado}>{saber.nome}</Text>
-                      <FontAwesome5
-                        name="plus-circle"
-                        size={16}
-                        color={Colors.secondary}
-                      />
-                    </TouchableOpacity>
-                  ))}
+              {buscaSaber.length > 0 && (
+                <View style={estilos.listaResultados}>
+                  {catalogoSaberesBD
+                    .filter((s) =>
+                      s.nome.toLowerCase().includes(buscaSaber.toLowerCase()),
+                    )
+                    .map((saber, i) => (
+                      <TouchableOpacity
+                        key={i}
+                        style={estilos.itemResultado}
+                        onPress={() => adicionarInteresse(saber)}
+                      >
+                        <Text style={estilos.textoResultado}>{saber.nome}</Text>
+                        <Feather name="plus-circle" size={18} color="#008A46" />
+                      </TouchableOpacity>
+                    ))}
                 </View>
               )}
 
-              {/* Nuvem de Tags */}
               <View style={estilos.containerTags}>
                 {interesses.map((item, i) => (
-                  <View key={i} style={estilos.tagInteresse}>
-                    <Text style={estilos.textoTag}>
+                  <View key={i} style={estilos.chipTag}>
+                    <Text style={estilos.textoChip}>
                       {item.saber?.nome || item.nome}
                     </Text>
                     <TouchableOpacity
                       onPress={() =>
                         removerInteresse(item.saber?.id || item.id)
                       }
-                      style={{ marginLeft: 8 }}
                     >
-                      <FontAwesome5
-                        name="times"
-                        size={12}
-                        color={Colors.card}
+                      <Feather
+                        name="x"
+                        size={14}
+                        color="#FFF"
+                        style={{ marginLeft: 6 }}
                       />
                     </TouchableOpacity>
                   </View>
                 ))}
               </View>
 
-              <TouchableOpacity
-                style={[
-                  estilos.botaoSalvarSeccional,
-                  { width: "100%", marginTop: 20 },
-                ]}
-                onPress={salvarPerfilAluno}
-              >
-                <Text style={estilos.textoBotaoSeccional}>
-                  Salvar Perfil de Aluno
-                </Text>
-              </TouchableOpacity>
+              <BotaoCustomizado
+                text="Salvar Perfil de Aluno"
+                aoClicar={salvarPerfilAluno}
+                carregando={salvandoAluno}
+              />
             </View>
-          ) : (
-            <View style={estilos.blocoEspecifico}>
-              <Text style={[estilos.tituloSessao, { alignSelf: "flex-start" }]}>
-                Sua Metodologia (Bio)
-              </Text>
+          )}
 
-              <View
-                style={[
-                  estilos.inputNeumorfico,
-                  {
-                    height: 100,
-                    alignItems: "flex-start",
-                    paddingVertical: 10,
-                    width: "100%",
-                  },
-                ]}
-              >
+          {/* ========================================== */}
+          {/* PEÇA 3: CONFIGURAÇÕES DO PROFESSOR         */}
+          {/* ========================================== */}
+          {perfilAtivo === "Professor" && (
+            <View style={estilos.blocoConfiguracoes}>
+              {/* BIO */}
+              <Text style={estilos.tituloConfig}>
+                Metodologia e Experiência
+              </Text>
+              <Text style={estilos.subtituloConfig}>
+                Os alunos verão este texto no seu perfil ao agendar aulas.
+              </Text>
+              <View style={estilos.textAreaContainer}>
                 <TextInput
                   value={bioProfessor}
                   onChangeText={setBioProfessor}
                   multiline
-                  style={[estilos.textoInput, { textAlignVertical: "top" }]}
-                  placeholder="Explique como são suas aulas e sua experiência..."
-                  placeholderTextColor="#A6ACAF"
+                  style={estilos.textArea}
+                  placeholder="Fale sobre sua carreira, método de ensino..."
                 />
               </View>
 
-              <Text
-                style={[
-                  estilos.tituloSessao,
-                  { marginTop: 10, alignSelf: "flex-start" },
-                ]}
-              >
-                O que você ensina?
+              {/* ESPECIALIDADES - BLOCO DE ADIÇÃO */}
+              <Text style={[estilos.tituloConfig, { marginTop: 30 }]}>
+                Adicionar Nova Disciplina
+              </Text>
+              <Text style={estilos.subtituloConfig}>
+                Pesquise a matéria e defina o valor da sua hora/aula para ela.
               </Text>
 
-              {/* Barra de Pesquisa */}
-              <View style={[estilos.inputNeumorfico, { width: "100%" }]}>
-                <MaterialIcons
-                  name="search"
-                  size={20}
-                  color={Colors.primary}
-                  style={{ marginRight: 10 }}
-                />
+              <View style={estilos.buscaContainer}>
+                <Feather name="search" size={20} color="#999" />
                 <TextInput
                   value={buscaSaberProf}
                   onChangeText={setBuscaSaberProf}
-                  style={estilos.textoInput}
-                  placeholder="Pesquise uma matéria (ex: Python)..."
-                  placeholderTextColor="#A6ACAF"
+                  style={estilos.inputBuscaAptidao}
+                  placeholder="Pesquise a matéria..."
                 />
               </View>
 
-              {/* Caixa Suspensa de Resultados */}
-              {saberesProfFiltrados.length > 0 && (
-                <View style={estilos.caixaResultados}>
-                  {saberesProfFiltrados.map((saber, i) => (
-                    <TouchableOpacity
-                      key={i}
-                      style={estilos.itemResultado}
-                      onPress={() => prepararAptidao(saber)}
-                    >
-                      <Text style={estilos.textoResultado}>{saber.nome}</Text>
-                      <FontAwesome5
-                        name="arrow-right"
-                        size={14}
-                        color={Colors.primary}
-                      />
-                    </TouchableOpacity>
-                  ))}
+              {buscaSaberProf.length > 0 && (
+                <View style={estilos.listaResultados}>
+                  {catalogoSaberesBD
+                    .filter((s) =>
+                      s.nome
+                        .toLowerCase()
+                        .includes(buscaSaberProf.toLowerCase()),
+                    )
+                    .map((saber, i) => (
+                      <TouchableOpacity
+                        key={i}
+                        style={estilos.itemResultado}
+                        onPress={() => prepararAptidao(saber)}
+                      >
+                        <Text style={estilos.textoResultado}>{saber.nome}</Text>
+                        <Feather name="arrow-right" size={18} color="#FF6B1A" />
+                      </TouchableOpacity>
+                    ))}
                 </View>
               )}
 
-              {/* Mini-Formulário de Detalhes da Aula */}
+              {/* MINI FORMULÁRIO DE ADIÇÃO */}
               {saberProfSelecionado && (
                 <View style={estilos.miniFormAptidao}>
                   <Text style={estilos.textoDestaqueAptidao}>
                     Configurando: {saberProfSelecionado.nome}
                   </Text>
 
-                  <Text style={estilos.labelAptidao}>Nível de Domínio:</Text>
+                  <Text style={estilos.labelInput}>Nível de Domínio</Text>
                   <View style={estilos.botoesNivel}>
                     {["Iniciante", "Intermediário", "Avançado"].map((nivel) => (
                       <TouchableOpacity
@@ -817,75 +741,79 @@ export default function PerfilPeca1() {
                     ))}
                   </View>
 
-                  <Text style={estilos.labelAptidao}>
-                    Preço da Hora/Aula (R$):
-                  </Text>
-                  <View
-                    style={[
-                      estilos.inputNeumorfico,
-                      { height: 45, marginBottom: 15 },
-                    ]}
-                  >
-                    <TextInput
-                      value={precoProf}
-                      onChangeText={setPrecoProf}
-                      keyboardType="numeric"
-                      style={estilos.textoInput}
-                      placeholder="Ex: 50,00"
-                    />
-                  </View>
+                  <Text style={estilos.labelInput}>Valor Hora/Aula (R$)</Text>
+                  <InputCustomizado
+                    placeholder="Ex: 60,00"
+                    valor={precoProf}
+                    aoMudarTexto={setPrecoProf}
+                    keyboardType="numeric"
+                  />
 
-                  <TouchableOpacity
-                    style={estilos.botaoConfirmarMini}
-                    onPress={confirmarAdicaoAptidao}
-                  >
-                    <Text style={{ color: "#FFF", fontWeight: "bold" }}>
-                      Adicionar ao meu catálogo
-                    </Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: "row", gap: 10, marginTop: 5 }}>
+                    <TouchableOpacity
+                      style={estilos.botaoCancelarAptidao}
+                      onPress={cancelarAdicaoAptidao}
+                    >
+                      <Text style={estilos.textoCancelarAptidao}>Cancelar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={estilos.botaoAcaoRapida}
+                      onPress={confirmarAdicaoAptidao}
+                    >
+                      <Text style={estilos.textoAcaoRapida}>
+                        Confirmar Adição
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
 
-              {/* Lista Cartões de Aptidões Adicionadas */}
-              <View style={{ width: "100%", marginTop: 15 }}>
-                {aptidoes.map((item, i) => (
-                  <View key={i} style={estilos.cartaoAptidao}>
-                    <View>
-                      <Text style={estilos.tituloCartaoAptidao}>
-                        {item.nomeExibicao || item.saber?.nome}
-                      </Text>
-                      <Text style={estilos.textoDetalheAptidao}>
-                        Nível: {item.nivelDominio} • R$ {item.precoHora}
-                      </Text>
+              {aptidoes.length > 0 && (
+                <View style={estilos.blocoSeparador}>
+                  <Text style={estilos.tituloConfig}>Matérias Adicionadas</Text>
+                  <Text style={estilos.subtituloConfig}>
+                    Seu catálogo de disciplinas ativas.
+                  </Text>
+
+                  {aptidoes.map((item, i) => (
+                    <View key={i} style={estilos.cardItemAdicionado}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={estilos.tituloItemAdicionado}>
+                          {item.nomeExibicao || item.saber?.nome}
+                        </Text>
+                        <Text style={estilos.subtituloItemAdicionado}>
+                          Nível: {item.nivelDominio} • R${" "}
+                          {item.precoHora.toFixed(2)}/h
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() =>
+                          removerAptidao(item.saber?.id || item.saberId)
+                        }
+                        style={estilos.botaoRemoverIco}
+                      >
+                        <Feather name="trash-2" size={18} color="#D93838" />
+                      </TouchableOpacity>
                     </View>
-                    <TouchableOpacity
-                      onPress={() =>
-                        removerAptidao(item.saber?.id || item.saberId)
-                      }
-                    >
-                      <FontAwesome5 name="trash" size={16} color="#E74C3C" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
+                  ))}
+                </View>
+              )}
 
               {/* ========================================== */}
-              {/* 🟢 NOVA SEÇÃO: HORÁRIOS DISPONÍVEIS         */}
+              {/* GRADE DE DISPONIBILIDADE                   */}
               {/* ========================================== */}
-              <View style={estilos.divisorVisual} />
-              <Text
-                style={[
-                  estilos.tituloSessao,
-                  { alignSelf: "flex-start", marginTop: 10 },
-                ]}
-              >
-                Sua Disponibilidade
+              <Text style={[estilos.tituloConfig, { marginTop: 30 }]}>
+                Adicionar Horário Livre
+              </Text>
+              <Text style={estilos.subtituloConfig}>
+                Selecione os dias da semana e os intervalos de horários que você
+                atende.
               </Text>
 
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                style={{ marginVertical: 15, width: "100%" }}
+                style={{ marginVertical: 12 }}
               >
                 {diasDaSemanaDisponiveis.map((dia) => (
                   <TouchableOpacity
@@ -908,101 +836,168 @@ export default function PerfilPeca1() {
                 ))}
               </ScrollView>
 
-              <View
-                style={{
-                  flexDirection: "row",
-                  gap: 10,
-                  width: "100%",
-                  marginBottom: 15,
-                }}
-              >
-                <View style={[estilos.inputNeumorfico, { flex: 1 }]}>
-                  <TextInput
-                    value={horaInicio}
-                    onChangeText={setHoraInicio}
-                    style={estilos.textoInput}
-                    placeholder="Das (ex: 08:00)"
-                    maxLength={5}
-                  />
-                </View>
-                <View style={[estilos.inputNeumorfico, { flex: 1 }]}>
-                  <TextInput
-                    value={horaFim}
-                    onChangeText={setHoraFim}
-                    style={estilos.textoInput}
-                    placeholder="Até (ex: 12:00)"
-                    maxLength={5}
-                  />
-                </View>
+              {/* Seletores Visuais de Horário */}
+              <View style={{ flexDirection: "row", gap: 12, marginBottom: 15 }}>
+                <TouchableOpacity
+                  style={estilos.seletorTempo}
+                  onPress={() => {
+                    setTipoHorario("inicio");
+                    setModalHorarioVisivel(true);
+                  }}
+                >
+                  <Text style={estilos.labelTempo}>Das</Text>
+
+                  <Text
+                    style={
+                      horaInicio ? estilos.valorTempo : estilos.placeholderTempo
+                    }
+                  >
+                    {horaInicio || "--:--"}
+                  </Text>
+                  <Feather name="clock" size={16} color="#999" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={estilos.seletorTempo}
+                  onPress={() => {
+                    setTipoHorario("fim");
+                    setModalHorarioVisivel(true);
+                  }}
+                >
+                  <Text style={estilos.labelTempo}>Até</Text>
+
+                  <Text
+                    style={
+                      horaFim ? estilos.valorTempo : estilos.placeholderTempo
+                    }
+                  >
+                    {horaFim || "--:--"}
+                  </Text>
+                  <Feather name="clock" size={16} color="#999" />
+                </TouchableOpacity>
               </View>
 
               <TouchableOpacity
-                style={estilos.botaoSecundario}
+                style={estilos.botaoAcaoSecundaria}
                 onPress={adicionarDisponibilidade}
               >
-                <Text style={estilos.textoBotaoSecundario}>
-                  + Adicionar Horário
+                <Feather
+                  name="plus-circle"
+                  size={16}
+                  color="#0057B8"
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={estilos.textoAcaoSecundaria}>
+                  Adicionar Horário na Agenda
                 </Text>
               </TouchableOpacity>
 
-              <View style={{ width: "100%", marginTop: 15 }}>
-                {disponibilidades.map((disp, i) => (
-                  <View key={i} style={estilos.cartaoAptidao}>
-                    <View>
-                      <Text style={estilos.tituloCartaoAptidao}>
-                        {disp.diaSemana}
-                      </Text>
-                      <Text style={estilos.textoDetalheAptidao}>
-                        {disp.horaInicio} às {disp.horaFim}
-                      </Text>
+              {disponibilidades.length > 0 && (
+                <View style={estilos.blocoSeparador}>
+                  <Text style={estilos.tituloConfig}>Horários Salvos</Text>
+                  <Text style={estilos.subtituloConfig}>
+                    Os alunos poderão agendar aulas nestes intervalos.
+                  </Text>
+
+                  {disponibilidades.map((disp, i) => (
+                    <View key={i} style={estilos.cardItemAdicionado}>
+                      <View
+                        style={{
+                          flex: 1,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 10,
+                        }}
+                      >
+                        <View style={estilos.bulletCalendario}>
+                          <Feather name="calendar" size={14} color="#FF6B1A" />
+                        </View>
+                        <View>
+                          <Text style={estilos.tituloItemAdicionado}>
+                            {disp.diaSemana}
+                          </Text>
+                          <Text style={estilos.subtituloItemAdicionado}>
+                            {disp.horaInicio.substring(0, 5)} às{" "}
+                            {disp.horaFim.substring(0, 5)}
+                          </Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => removerDisponibilidade(i)}
+                        style={estilos.botaoRemoverIco}
+                      >
+                        <Feather name="trash-2" size={18} color="#D93838" />
+                      </TouchableOpacity>
                     </View>
-                    <TouchableOpacity onPress={() => removerDisponibilidade(i)}>
-                      <FontAwesome5 name="trash" size={16} color="#E74C3C" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-              {/* ========================================== */}
+                  ))}
+                </View>
+              )}
 
-              <TouchableOpacity
-                style={[
-                  estilos.botaoSalvarSeccional,
-                  {
-                    width: "100%",
-                    marginTop: 20,
-                    backgroundColor: Colors.primary,
-                  },
-                ]}
-                onPress={salvarPerfilProfessor}
-              >
-                <Text style={estilos.textoBotaoSeccional}>
-                  Salvar Perfil de Professor
-                </Text>
-              </TouchableOpacity>
+              <View style={{ marginTop: 10 }}>
+                <BotaoCustomizado
+                  text="Salvar Perfil de Professor"
+                  aoClicar={salvarPerfilProfessor}
+                  carregando={salvandoProf}
+                />
+              </View>
             </View>
           )}
         </ScrollView>
 
-        {/* MODAL DE LOGOUT */}
+        {/* MODAL TIME PICKER (SELEÇÃO DE HORAS) */}
+        <Modal transparent visible={modalHorarioVisivel} animationType="slide">
+          <View style={estilos.modalOverlay}>
+            <View
+              style={[estilos.modalCard, { padding: 0, paddingBottom: 20 }]}
+            >
+              <View style={estilos.modalHeaderHorario}>
+                <Text style={estilos.modalTituloHorario}>
+                  {tipoHorario === "inicio"
+                    ? "Selecione o início"
+                    : "Selecione o término"}
+                </Text>
+                <TouchableOpacity onPress={() => setModalHorarioVisivel(false)}>
+                  <Feather name="x" size={24} color="#111" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ maxHeight: 300, width: "100%" }}>
+                {HORARIOS_LISTA.map((hora) => (
+                  <TouchableOpacity
+                    key={hora}
+                    style={estilos.itemListaHorario}
+                    onPress={() => processarSelecaoHorario(hora)}
+                  >
+                    <Text style={estilos.textoItemListaHorario}>{hora}</Text>
+                    <Feather name="chevron-right" size={16} color="#CCC" />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* MODAL DE LOGOUT SEGURO */}
         <Modal transparent visible={mostrarConfirmLogout} animationType="fade">
           <View style={estilos.modalOverlay}>
             <View style={estilos.modalCard}>
-              <Text style={estilos.modalTitulo}>Encerrar sessão?</Text>
-              <Text style={estilos.modalTexto}>
-                Deseja realmente sair do aplicativo?
+              <Text style={estilos.modalTituloLogout}>Sair da Conta</Text>
+              <Text style={estilos.modalTextoLogout}>
+                Tem certeza de que deseja encerrar a sua sessão neste
+                dispositivo?
               </Text>
               <View style={estilos.modalBotoes}>
                 <TouchableOpacity
                   style={[estilos.modalBotao, estilos.modalBotaoCancelar]}
-                  onPress={cancelarLogout}
+                  onPress={() => setMostrarConfirmLogout(false)}
                 >
-                  <Text style={estilos.modalBotaoTextoCancelar}>Cancelar</Text>
+                  <Text style={estilos.modalTextoBotaoCancelar}>Cancelar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[estilos.modalBotao, estilos.modalBotaoConfirmar]}
-                  onPress={confirmarLogout}
+                  onPress={handleLogout}
                 >
-                  <Text style={estilos.modalBotaoTexto}>Sair</Text>
+                  <Text style={estilos.modalTextoBotaoSair}>Sim, Sair</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1013,301 +1008,302 @@ export default function PerfilPeca1() {
   );
 }
 
+// ==========================================
+// 5. ESTILOS LOCAIS (STYLESHEET PREMIUM)
+// ==========================================
 const estilos = StyleSheet.create({
-  telaSegura: { backgroundColor: Colors.background, flex: 1 },
-  conteudoTela: { padding: 20, paddingBottom: 40 },
-  cabecalho: {
+  telaCarregamento: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#FFF",
+  },
+  telaGeral: { flex: 1, backgroundColor: "#FFF" },
+
+  headerNav: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 25,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
   },
-  tituloCabecalho: { fontSize: 18, fontWeight: "600", color: Colors.text },
-  botaoLogout: { padding: 5 },
-  containerAvatar: {
+  tituloHeader: { fontSize: 18, fontWeight: "bold", color: "#111" },
+
+  conteudoScroll: { padding: 20, paddingBottom: 60 },
+
+  // Avatar e Identidade
+  containerIdentidade: {
     alignItems: "center",
-    alignSelf: "center",
-    marginBottom: 25,
+    marginBottom: 30,
+    marginTop: 10,
   },
-  avatarNeumorfico: {
-    backgroundColor: Colors.card,
-    width: 85,
-    height: 85,
+  avatarContainer: { position: "relative", marginBottom: 16 },
+  avatarCirculo: {
+    width: 90,
+    height: 90,
     borderRadius: 45,
+    backgroundColor: "#E1F0FF",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
     elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
   },
-  letraAvatar: { fontSize: 32, color: Colors.secondary, fontWeight: "bold" },
-  nomeExibicao: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: Colors.text,
-    marginTop: 10,
-    textAlign: "center",
+  avatarLetra: { fontSize: 36, fontWeight: "bold", color: "#0057B8" },
+  iconeEdicaoFoto: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    backgroundColor: "#FF6B1A",
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#FFF",
   },
-  blocoFormulario: { width: "100%", marginBottom: 5 },
+  nomeDestaque: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#111",
+    letterSpacing: -0.5,
+  },
+  emailDestaque: { fontSize: 14, color: "#666", marginTop: 4 },
+
+  // Acordeões
+  cartaoAcordeao: {
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#EAEAEA",
+    borderRadius: 16,
+    marginBottom: 12,
+    overflow: "hidden",
+  },
   cabecalhoAcordeao: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    backgroundColor: Colors.card,
-    borderRadius: 15,
+    padding: 18,
+    backgroundColor: "#F8F9FA",
   },
-  conteudoAcordeao: { marginTop: 15 },
-  tituloSessao: { fontSize: 16, color: Colors.text, fontWeight: "bold" },
-  inputNeumorfico: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    paddingHorizontal: 15,
-    height: 50,
-    marginBottom: 12,
+  tituloSessao: { fontSize: 16, fontWeight: "700", color: "#111" },
+  conteudoAcordeao: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: "#F0F0F0",
   },
-  textoInput: { flex: 1, fontSize: 14, color: Colors.text },
-  inputBloqueado: { backgroundColor: Colors.input },
-  textoInputBloqueado: { flex: 1, fontSize: 14, color: "#7f8c8d" },
-  botaoSalvarSeccional: {
-    backgroundColor: Colors.secondary,
-    borderRadius: 12,
-    height: 45,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 5,
+  labelInput: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#444",
+    marginBottom: 6,
+    marginLeft: 4,
   },
-  textoBotaoSeccional: { color: Colors.card, fontSize: 14, fontWeight: "bold" },
-  divisorVisual: {
-    height: 1,
-    backgroundColor: Colors.border,
-    width: "100%",
-    marginVertical: 10,
-  },
-  botaoMudarSenha: {
-    borderColor: Colors.primary,
-    borderWidth: 1.5,
-    borderRadius: 12,
-    height: 45,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 5,
-  },
-  textoMudarSenha: { color: Colors.primary, fontSize: 14, fontWeight: "bold" },
 
-  containerSelector: {
+  inputBloqueadoContainer: {
     flexDirection: "row",
-    backgroundColor: Colors.input,
-    borderRadius: 15,
-    padding: 5,
-    marginVertical: 20,
-    width: "100%",
+    alignItems: "center",
+    backgroundColor: "#F4F6F7",
+    borderWidth: 1,
+    borderColor: "#EAEAEA",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 52,
+    marginBottom: 16,
   },
-  botaoSelector: {
+  textoInputBloqueado: { flex: 1, fontSize: 15, color: "#777" },
+
+  // Segmented Control
+  segmentedControl: {
+    flexDirection: "row",
+    backgroundColor: "#F0F2F5",
+    borderRadius: 12,
+    padding: 4,
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  segmentTab: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 12,
     alignItems: "center",
+    borderRadius: 10,
   },
-  botaoSelectorAtivo: {
-    backgroundColor: Colors.secondary,
+  segmentTabAtiva: {
+    backgroundColor: "#FFF",
+    elevation: 2,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  textoSelector: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#7f8c8d",
-  },
-  textoSelectorAtivo: {
-    color: Colors.card,
-  },
-
-  blocoEspecifico: {
-    padding: 20,
-    backgroundColor: Colors.card,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    minHeight: 150,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  textoPlaceholder: {
-    color: "#A6ACAF",
-    fontSize: 13,
-    textAlign: "center",
-    marginTop: 10,
-    fontStyle: "italic",
-  },
-  caixaResultados: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    padding: 5,
-    marginTop: -10,
-    marginBottom: 15,
-    width: "100%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowRadius: 2,
+  },
+  segmentTexto: { fontSize: 14, fontWeight: "600", color: "#777" },
+  segmentTextoAtivo: { color: "#111", fontWeight: "700" },
+
+  // Blocos
+  blocoConfiguracoes: {
+    backgroundColor: "#FFF",
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "#EAEAEA",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 5,
+    elevation: 1,
+  },
+  blocoSeparador: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: "#F0F0F0",
+  }, // 🟢 Novo bloco para isolar listagens
+
+  tituloConfig: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#111",
+    marginBottom: 4,
+  },
+  subtituloConfig: { fontSize: 13, color: "#666", marginBottom: 16 },
+
+  textAreaContainer: {
+    backgroundColor: "#FAFAFA",
+    borderWidth: 1,
+    borderColor: "#EAEAEA",
+    borderRadius: 12,
+    padding: 14,
+    minHeight: 110,
+  },
+  textArea: { fontSize: 15, color: "#333", textAlignVertical: "top", flex: 1 },
+
+  // Buscas
+  buscaContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FAFAFA",
+    borderWidth: 1,
+    borderColor: "#EAEAEA",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 52,
+  },
+  inputBuscaAptidao: { flex: 1, fontSize: 15, marginLeft: 10, color: "#111" },
+  listaResultados: {
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#EAEAEA",
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    marginTop: -4,
+    elevation: 2,
+    zIndex: 10,
   },
   itemResultado: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    borderBottomColor: Colors.border,
+    padding: 16,
     borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
   },
-  textoResultado: { fontSize: 14, color: Colors.text, fontWeight: "500" },
+  textoResultado: { fontSize: 14, fontWeight: "500", color: "#333" },
+
   containerTags: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginTop: 5,
-    width: "100%",
+    marginTop: 15,
+    marginBottom: 10,
   },
-  tagInteresse: {
+  chipTag: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.secondary,
+    backgroundColor: "#FF6B1A",
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
   },
-  textoTag: { color: Colors.card, fontSize: 13, fontWeight: "bold" },
+  textoChip: { color: "#FFF", fontSize: 13, fontWeight: "bold" },
 
   miniFormAptidao: {
-    width: "100%",
-    backgroundColor: Colors.background,
-    padding: 15,
+    backgroundColor: "#F8F9FA",
+    padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 15,
+    borderColor: "#EAEAEA",
+    marginTop: 15,
+    marginBottom: 10,
   },
   textoDestaqueAptidao: {
     fontSize: 15,
-    fontWeight: "bold",
-    color: Colors.primary,
-    marginBottom: 10,
-    textAlign: "center",
+    fontWeight: "700",
+    color: "#0057B8",
+    marginBottom: 14,
   },
-  labelAptidao: {
-    fontSize: 13,
-    color: Colors.text,
-    marginBottom: 5,
-    fontWeight: "500",
-  },
-  botoesNivel: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 15,
-  },
+  botoesNivel: { flexDirection: "row", gap: 8, marginBottom: 16 },
   botaoNivel: {
     flex: 1,
-    paddingVertical: 8,
-    marginHorizontal: 2,
-    backgroundColor: Colors.card,
+    paddingVertical: 10,
+    alignItems: "center",
     borderRadius: 8,
+    backgroundColor: "#FFF",
     borderWidth: 1,
-    borderColor: Colors.border,
-    alignItems: "center",
+    borderColor: "#DDD",
   },
-  botaoNivelAtivo: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  textoNivel: { fontSize: 12, color: Colors.text },
-  textoNivelAtivo: { color: "#FFF", fontWeight: "bold" },
-  modalOverlay: {
-    backgroundColor: "rgba(0,0,0,0.35)",
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 20,
-    padding: 24,
-    width: "85%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  modalTitulo: {
-    color: Colors.secondary,
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 10,
-    textAlign: "center",
-  },
-  modalTexto: {
-    color: Colors.text,
-    fontSize: 15,
-    marginBottom: 20,
-    textAlign: "center",
-  },
-  modalBotoes: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  modalBotao: {
-    flex: 1,
-    borderRadius: 12,
-    paddingVertical: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalBotaoCancelar: {
-    backgroundColor: Colors.border,
-  },
-  modalBotaoConfirmar: {
-    backgroundColor: Colors.secondary,
-  },
-  modalBotaoTexto: {
-    color: "white",
-    fontWeight: "bold",
-  },
-  modalBotaoTextoCancelar: {
-    color: Colors.text,
-    fontWeight: "bold",
-  },
-  botaoConfirmarMini: {
-    backgroundColor: Colors.secondary,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  cartaoAptidao: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: Colors.background,
-    padding: 12,
-    borderRadius: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.primary,
-    marginBottom: 8,
-  },
-  tituloCartaoAptidao: { fontSize: 14, fontWeight: "bold", color: Colors.text },
-  textoDetalheAptidao: { fontSize: 12, color: "#7f8c8d", marginTop: 2 },
+  botaoNivelAtivo: { backgroundColor: "#0057B8", borderColor: "#0057B8" },
+  textoNivel: { fontSize: 12, fontWeight: "600", color: "#555" },
+  textoNivelAtivo: { color: "#FFF" },
 
-  // 🟢 ESTILOS DA GRADE DE HORÁRIOS ADICIONADOS AQUI
+  botaoAcaoRapida: {
+    backgroundColor: "#008A46",
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    flex: 1,
+  },
+  textoAcaoRapida: { color: "#FFF", fontWeight: "bold", fontSize: 14 },
+  botaoCancelarAptidao: {
+    backgroundColor: "#EAEAEA",
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    flex: 1,
+  },
+  textoCancelarAptidao: { color: "#555", fontWeight: "bold", fontSize: 14 },
+
+  botaoAcaoSecundaria: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#EEF5FF",
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 15,
+  },
+  textoAcaoSecundaria: { color: "#0057B8", fontWeight: "bold", fontSize: 14 },
+
+  cardItemAdicionado: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#EAEAEA",
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  tituloItemAdicionado: { fontSize: 15, fontWeight: "700", color: "#111" },
+  subtituloItemAdicionado: { fontSize: 13, color: "#666", marginTop: 2 },
+  botaoRemoverIco: { padding: 8, backgroundColor: "#FFF0F0", borderRadius: 8 },
+  bulletCalendario: { padding: 8, backgroundColor: "#FFF0E7", borderRadius: 8 },
+
   tagDia: {
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -1317,20 +1313,86 @@ const estilos = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#EAEAEA",
   },
-  tagDiaAtiva: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  tagDiaAtiva: { backgroundColor: "#0057B8", borderColor: "#0057B8" },
   textoDia: { fontWeight: "600", color: "#555" },
   textoDiaAtivo: { color: "#FFF" },
-  botaoSecundario: {
-    width: "100%",
-    paddingVertical: 12,
+
+  // Seletor de Tempo
+  seletorTempo: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FAFAFA",
+    borderWidth: 1,
+    borderColor: "#EAEAEA",
     borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
+    paddingHorizontal: 12,
+    height: 52,
+  },
+  labelTempo: { fontSize: 12, color: "#888", marginRight: 8 },
+  valorTempo: { flex: 1, fontSize: 15, color: "#111", fontWeight: "600" },
+  placeholderTempo: { flex: 1, fontSize: 15, color: "#A6ACAF" },
+
+  // Modal Time Picker
+  modalHeaderHorario: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+    width: "100%",
+  },
+  modalTituloHorario: { fontSize: 18, fontWeight: "bold", color: "#111" },
+  itemListaHorario: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F8F9FA",
+    width: "100%",
+  },
+  textoItemListaHorario: { fontSize: 16, fontWeight: "500", color: "#333" },
+
+  // Modal Logout Seguro
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
     alignItems: "center",
   },
-  textoBotaoSecundario: {
-    color: Colors.primary,
-    fontWeight: "bold",
-    fontSize: 15,
+  modalCard: {
+    width: "85%",
+    backgroundColor: "#FFF",
+    borderRadius: 24,
+    padding: 24,
+    alignItems: "center",
+    elevation: 10,
   },
+  modalTituloLogout: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#111",
+    marginBottom: 10,
+  },
+  modalTextoLogout: {
+    fontSize: 15,
+    color: "#555",
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  modalBotoes: { flexDirection: "row", gap: 12, width: "100%" },
+  modalBotao: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  modalBotaoCancelar: { backgroundColor: "#F0F0F0" },
+  modalBotaoConfirmar: { backgroundColor: "#D93838" },
+  modalTextoBotaoCancelar: { color: "#444", fontWeight: "700", fontSize: 15 },
+  modalTextoBotaoSair: { color: "#FFF", fontWeight: "700", fontSize: 15 },
 });
