@@ -1,5 +1,12 @@
+/**
+ * @file busca-professores.tsx
+ * @description Controlador da Tela de Busca Avançada de Professores.
+ * Permite pesquisa em tempo real (texto), filtros por disciplina, preço máximo
+ * e ordenação customizada. Suporta recebimento de parâmetros de rota para pré-filtragem.
+ */
+
 import { Feather, Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -10,38 +17,94 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
+// Componentes Unificados e Configurações
 import BarraBusca from "../components/BarraBusca";
 import CardProfessor from "../components/CardProfessor";
 import { API_URL } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 
-export default function BuscaProfessores() {
-  const { usuarioId, carregandoAuth } = useAuth();
+// ==========================================
+// 1. CONTRATOS DE TIPAGEM (INTERFACES TS)
+// ==========================================
 
-  // Estados de Dados
-  const [professoresBanco, setProfessoresBanco] = useState<any[]>([]);
-  const [professoresFiltrados, setProfessoresFiltrados] = useState<any[]>([]);
-  const [saberes, setSaberes] = useState<string[]>(["Todas"]); // 🟢 Estado para a lista oficial de matérias
+interface Saber {
+  id: number;
+  nome: string;
+}
+
+interface Aptidao {
+  saber: Saber;
+  precoHora: number;
+}
+
+interface ProfessorBusca {
+  id: number;
+  nome: string;
+  notaMedia?: number;
+  totalAvaliacoes?: number;
+  fotoUrl?: string;
+  aptidoes?: Aptidao[];
+}
+
+// ==========================================
+// 2. COMPONENTE PRINCIPAL
+// ==========================================
+
+export default function BuscaProfessores() {
+  const { usuarioId, carregandoAuth } = useAuth() as any;
+
+  // 🟢 Captura do parâmetro de rota enviado pela Home (Carrossel de Categorias)
+  const { categoria } = useLocalSearchParams<{ categoria?: string }>();
+
+  // ==========================================
+  // ESTADOS DE DADOS
+  // ==========================================
+  const [professoresBanco, setProfessoresBanco] = useState<ProfessorBusca[]>(
+    [],
+  );
+  const [professoresFiltrados, setProfessoresFiltrados] = useState<
+    ProfessorBusca[]
+  >([]);
+  const [saberes, setSaberes] = useState<string[]>(["Todas"]);
   const [carregando, setCarregando] = useState(false);
+
+  // Paginação
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [paginaMaximaVisivel, setPaginaMaximaVisivel] = useState(1);
   const [temMaisPaginas, setTemMaisPaginas] = useState(true);
   const [paginaLocalFallback, setPaginaLocalFallback] = useState(false);
   const PAGE_SIZE = 20;
 
-  // Estados de Filtro
+  // ==========================================
+  // ESTADOS DE FILTRO
+  // ==========================================
   const [busca, setBusca] = useState("");
-  const [filtroMateria, setFiltroMateria] = useState("Todas");
+  // 🟢 Inicializa o filtro de matéria com a categoria recebida na rota (ou "Todas" se for null)
+  const [filtroMateria, setFiltroMateria] = useState<string>(
+    categoria || "Todas",
+  );
   const [filtroPrecoMax, setFiltroPrecoMax] = useState(150);
   const [ordenacao, setOrdenacao] = useState<
     "maisRelevantes" | "maisBarato" | "maisCaro"
   >("maisRelevantes");
 
-  // Estados de Interface
+  // Estados de Modais
   const [modalMateriaVisivel, setModalMateriaVisivel] = useState(false);
   const [modalPrecoVisivel, setModalPrecoVisivel] = useState(false);
   const [modalOrdenacaoVisivel, setModalOrdenacaoVisivel] = useState(false);
 
+  // Monitora alterações nos parâmetros de rota para atualizar o filtro dinamicamente
+  useEffect(() => {
+    if (categoria) {
+      setFiltroMateria(categoria);
+    }
+  }, [categoria]);
+
+  /**
+   * Dispara a requisição paginada para buscar os professores no banco de dados.
+   * @async
+   */
   const buscarProfessoresPagina = useCallback(
     async (page: number) => {
       if (!usuarioId) return;
@@ -49,14 +112,12 @@ export default function BuscaProfessores() {
 
       try {
         const url = `${API_URL}/api/usuarios/professores/destaque/${usuarioId}`;
-        console.log("[BuscaProfessores] GET:", url);
         const resProfs = await fetch(url);
-        console.log("[BuscaProfessores] status:", resProfs.status);
 
         if (resProfs.ok) {
-          const dadosProfs = await resProfs.json();
-          console.log("[BuscaProfessores] professores recebidos:", dadosProfs.length);
-          const servidorRetornouTudo = page === 1 && dadosProfs.length > PAGE_SIZE;
+          const dadosProfs: ProfessorBusca[] = await resProfs.json();
+          const servidorRetornouTudo =
+            page === 1 && dadosProfs.length > PAGE_SIZE;
 
           if (servidorRetornouTudo) {
             setPaginaLocalFallback(true);
@@ -66,7 +127,10 @@ export default function BuscaProfessores() {
             setPaginaLocalFallback(false);
             setTemMaisPaginas(dadosProfs.length === PAGE_SIZE);
             setPaginaMaximaVisivel((anterior) =>
-              Math.max(anterior, page + (dadosProfs.length === PAGE_SIZE ? 1 : 0)),
+              Math.max(
+                anterior,
+                page + (dadosProfs.length === PAGE_SIZE ? 1 : 0),
+              ),
             );
           }
 
@@ -75,7 +139,7 @@ export default function BuscaProfessores() {
           setPaginaAtual(page);
         }
       } catch (e) {
-        console.error("Erro ao buscar professors por página:", e);
+        console.error("Erro ao buscar professores por página:", e);
       } finally {
         setCarregando(false);
       }
@@ -96,13 +160,11 @@ export default function BuscaProfessores() {
     router.replace("/(tabs)");
   };
 
-  // 1. BUSCA INICIAL NO BANCO DE DADOS
+  // ==========================================
+  // EFEITO 1: BUSCA INICIAL NO BANCO DE DADOS
+  // ==========================================
   useEffect(() => {
-    if (carregandoAuth || !usuarioId) {
-      console.log("[BuscaProfessores] aguardando auth... carregandoAuth:", carregandoAuth, "usuarioId:", usuarioId);
-      return;
-    }
-    console.log("[BuscaProfessores] auth pronta, iniciando busca para usuarioId:", usuarioId);
+    if (carregandoAuth || !usuarioId) return;
 
     let cancelado = false;
 
@@ -117,14 +179,15 @@ export default function BuscaProfessores() {
       try {
         const resSaberes = await fetch(`${API_URL}/api/saberes`);
         if (!cancelado && resSaberes.ok) {
-          const dadosSaberes = await resSaberes.json();
-          const nomesSaberes = dadosSaberes.map((s: any) => s.nome);
+          const dadosSaberes: Saber[] = await resSaberes.json();
+          const nomesSaberes = dadosSaberes.map((s) => s.nome);
           setSaberes(["Todas", ...nomesSaberes]);
         }
 
         await buscarProfessoresPagina(1);
       } catch (e) {
-        if (!cancelado) console.error("Erro ao buscar dados da tela de busca:", e);
+        if (!cancelado)
+          console.error("Erro ao buscar dados da tela de busca:", e);
       } finally {
         if (!cancelado) setCarregando(false);
       }
@@ -137,14 +200,20 @@ export default function BuscaProfessores() {
     };
   }, [carregandoAuth, usuarioId, buscarProfessoresPagina]);
 
-  // 2. MOTOR DE BUSCA EM TEMPO REAL
+  // ==========================================
+  // EFEITO 2: MOTOR DE BUSCA E FILTRAGEM (CLIENT-SIDE)
+  // ==========================================
   const professoresExibicao = paginaLocalFallback
-    ? professoresFiltrados.slice((paginaAtual - 1) * PAGE_SIZE, paginaAtual * PAGE_SIZE)
+    ? professoresFiltrados.slice(
+        (paginaAtual - 1) * PAGE_SIZE,
+        paginaAtual * PAGE_SIZE,
+      )
     : professoresFiltrados;
 
   useEffect(() => {
     let resultado = professoresBanco;
 
+    // 1. Filtro por Texto Livre (Nome ou Matéria)
     if (busca.trim() !== "") {
       const termo = busca.toLowerCase();
       resultado = resultado.filter((prof) => {
@@ -155,6 +224,7 @@ export default function BuscaProfessores() {
       });
     }
 
+    // 2. Filtro por Matéria Selecionada no Dropdown
     if (filtroMateria !== "Todas") {
       resultado = resultado.filter((prof) => {
         const materiaProf = prof.aptidoes?.[0]?.saber?.nome || "";
@@ -162,11 +232,13 @@ export default function BuscaProfessores() {
       });
     }
 
+    // 3. Filtro por Preço Máximo
     resultado = resultado.filter((prof) => {
       const precoProf = prof.aptidoes?.[0]?.precoHora || 0;
       return precoProf <= filtroPrecoMax;
     });
 
+    // 4. Lógica de Ordenação
     if (ordenacao === "maisBarato") {
       resultado = resultado.slice().sort((a, b) => {
         const precoA = a.aptidoes?.[0]?.precoHora || 0;
@@ -184,9 +256,12 @@ export default function BuscaProfessores() {
     setProfessoresFiltrados(resultado);
   }, [busca, filtroMateria, filtroPrecoMax, ordenacao, professoresBanco]);
 
+  // ==========================================
+  // RENDERIZAÇÃO DA INTERFACE
+  // ==========================================
   return (
     <View style={estilos.container}>
-      {/* Header */}
+      {/* Header Fixo */}
       <View style={estilos.header}>
         <TouchableOpacity onPress={handleFecharBusca}>
           <Ionicons name="close" size={32} color="#111" />
@@ -194,7 +269,7 @@ export default function BuscaProfessores() {
         <Text style={estilos.tituloPagina}>Buscar professores</Text>
       </View>
 
-      {/* Barra de Busca Live */}
+      {/* Barra de Busca de Texto */}
       <View style={{ paddingHorizontal: 20 }}>
         <BarraBusca
           valor={busca}
@@ -208,7 +283,7 @@ export default function BuscaProfessores() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
       >
-        {/* Chips de Busca Rápida */}
+        {/* Filtros Rápidos (Chips) */}
         <Text style={estilos.labelSecao}>Buscas populares</Text>
         <ScrollView
           horizontal
@@ -233,7 +308,7 @@ export default function BuscaProfessores() {
           ))}
         </ScrollView>
 
-        {/* Botões de Filtros Avançados */}
+        {/* Barramento de Filtros Dropdown */}
         <Text style={estilos.labelSecao}>Filtros</Text>
         <View style={estilos.containerFiltros}>
           <TouchableOpacity
@@ -267,14 +342,14 @@ export default function BuscaProfessores() {
               {ordenacao === "maisRelevantes"
                 ? "Mais relevantes"
                 : ordenacao === "maisBarato"
-                ? "Mais barato"
-                : "Mais caro"}
+                  ? "Mais barato"
+                  : "Mais caro"}
             </Text>
             <Feather name="chevron-down" size={18} color="#999" />
           </TouchableOpacity>
         </View>
 
-        {/* Contador */}
+        {/* Indicador de Resultados */}
         <View style={estilos.linhaInfo}>
           <Text style={estilos.textoResultados}>
             {carregando
@@ -283,7 +358,7 @@ export default function BuscaProfessores() {
           </Text>
         </View>
 
-        {/* Renderização dos Cartões */}
+        {/* Lista de Resultados e Paginação */}
         <View style={{ paddingHorizontal: 20, marginTop: 10 }}>
           {carregando ? (
             <ActivityIndicator
@@ -302,7 +377,7 @@ export default function BuscaProfessores() {
                   avaliacoes={prof.totalAvaliacoes || 0}
                   precoHora={prof.aptidoes?.[0]?.precoHora || 0}
                   fotoUrl={
-                    prof.fotoUrl || "https://i.pravatar.cc/150?u=" + prof.id
+                    prof.fotoUrl || `https://i.pravatar.cc/150?u=${prof.id}`
                   }
                   onPress={() => router.push(`/professor/${prof.id}`)}
                 />
@@ -316,7 +391,8 @@ export default function BuscaProfessores() {
                       key={numeroPagina}
                       style={[
                         estilos.paginaBotao,
-                        paginaAtual === numeroPagina && estilos.paginaBotaoAtivo,
+                        paginaAtual === numeroPagina &&
+                          estilos.paginaBotaoAtivo,
                       ]}
                       onPress={() => selecionarPagina(numeroPagina)}
                     >
@@ -350,16 +426,14 @@ export default function BuscaProfessores() {
       </ScrollView>
 
       {/* ===================================== */}
-      {/* MODAIS DE FILTRO */}
+      {/* MODAIS DE APOIO (OVERLAYS) */}
       {/* ===================================== */}
 
-      {/* Modal Matéria 🟢 AGORA USANDO A LISTA OFICIAL DO BANCO */}
+      {/* Modal de Matérias */}
       <Modal visible={modalMateriaVisivel} transparent animationType="slide">
         <View style={estilos.fundoModal}>
           <View style={estilos.containerModal}>
             <Text style={estilos.tituloModal}>Filtrar por Matéria</Text>
-
-            {/* Adicionamos um ScrollView para caso tenha muitas matérias no banco */}
             <ScrollView
               showsVerticalScrollIndicator={false}
               style={{ maxHeight: 300 }}
@@ -385,7 +459,6 @@ export default function BuscaProfessores() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
-
             <TouchableOpacity
               style={estilos.botaoFecharModal}
               onPress={() => setModalMateriaVisivel(false)}
@@ -396,7 +469,7 @@ export default function BuscaProfessores() {
         </View>
       </Modal>
 
-      {/* Modal Ordenação */}
+      {/* Modal de Ordenação */}
       <Modal visible={modalOrdenacaoVisivel} transparent animationType="slide">
         <View style={estilos.fundoModal}>
           <View style={estilos.containerModal}>
@@ -440,7 +513,7 @@ export default function BuscaProfessores() {
         </View>
       </Modal>
 
-      {/* Modal Preço */}
+      {/* Modal de Preço */}
       <Modal visible={modalPrecoVisivel} transparent animationType="slide">
         <View style={estilos.fundoModal}>
           <View style={estilos.containerModal}>
@@ -478,6 +551,9 @@ export default function BuscaProfessores() {
   );
 }
 
+// ==========================================
+// FOLHA DE ESTILOS
+// ==========================================
 const estilos = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFF" },
   header: {
@@ -495,7 +571,6 @@ const estilos = StyleSheet.create({
     flex: 1,
     marginLeft: 15,
   },
-
   labelSecao: {
     fontSize: 18,
     fontWeight: "bold",
@@ -503,7 +578,6 @@ const estilos = StyleSheet.create({
     marginTop: 25,
     marginBottom: 15,
   },
-
   scrollChips: { paddingLeft: 20, marginBottom: 5 },
   chip: {
     backgroundColor: "#F5F7FA",
@@ -517,7 +591,6 @@ const estilos = StyleSheet.create({
   chipAtivo: { backgroundColor: "#FFF0E7", borderColor: "#FF6B1A" },
   textoChip: { fontWeight: "600", color: "#444" },
   textoChipAtivo: { color: "#FF6B1A" },
-
   containerFiltros: { paddingHorizontal: 20, gap: 12 },
   botaoFiltroLargo: {
     flexDirection: "row",
@@ -529,7 +602,6 @@ const estilos = StyleSheet.create({
     justifyContent: "space-between",
   },
   textoFiltroBotao: { flex: 1, marginLeft: 12, fontSize: 15, color: "#333" },
-
   linhaInfo: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -538,7 +610,6 @@ const estilos = StyleSheet.create({
     alignItems: "center",
   },
   textoResultados: { color: "#888", fontSize: 14 },
-
   fundoModal: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
