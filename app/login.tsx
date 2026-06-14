@@ -1,52 +1,39 @@
 import { BotaoCustomizado } from "@/src/components/BotaoCustomizado";
 import { InputCustomizado } from "@/src/components/InputCustomizado";
 import { FontAwesome } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Alert,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { API_URL } from "../config/api";
 import { Colors } from "../constants/colors";
 
+// 🟢 IMPORTAÇÃO DO CONTEXTO
+import { useAuth } from "../context/AuthContext";
 
-/**
- * COMPONENTE DE LOGIN (Porta de Entrada e Autenticação)
- * * Roteiro de Defesa para a Banca: "Este componente é o responsável pela autenticação do usuário.
- * Nós utilizamos o conceito de 'Controlled Components' (Componentes Controlados) do React,
- * onde os inputs de e-mail e senha têm seus estados gerenciados diretamente pelo hook useState.
- * Além disso, fazemos a persistência da sessão (ID e Perfil) utilizando o AsyncStorage,
- * o que permite que o aplicativo mantenha o usuário logado mesmo após ser fechado."
- */
 export default function Login() {
-  // O motorista do nosso aplicativo (Navegação)
   const roteador = useRouter();
 
-  // ==========================================
-  // 1. GERENCIAMENTO DE ESTADO (Hooks)
-  // ==========================================
+  // 🟢 PUXANDO A FUNÇÃO GLOBAL DE LOGIN
+  const { loginGlobal } = useAuth() as any;
+
   const [email, definirEmail] = useState("");
   const [senha, definirSenha] = useState("");
-  const [perfil, definirPerfil] = useState("Aluno"); // Padrão selecionado
+  const [perfil, definirPerfil] = useState("Aluno");
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [modalErroVisivel, setModalErroVisivel] = useState(false);
   const [modalErroTexto, setModalErroTexto] = useState("");
   const [emailErro, setEmailErro] = useState("");
   const [senhaErro, setSenhaErro] = useState("");
 
-  // ==========================================
-  // 2. FUNÇÃO DE INTEGRAÇÃO COM A API (Autenticação)
-  // ==========================================
-  /**
-   * * Roteiro para a Banca: "A função executarLogin é assíncrona (async/await) porque a
-   * comunicação na rede pode levar tempo. Primeiro, fazemos uma validação no lado do
-   * cliente (Front-end) para evitar requisições vazias. Depois, disparamos um POST
-   * para o Spring Boot. Se a resposta for 200 OK, nós extraímos o JSON retornado pelo
-   * servidor e salvamos o ID do usuário localmente. Esse ID é a 'Chave Estrangeira'
-   * que usaremos nas outras telas para carregar os dados específicos dele."
-   */
   const executarLogin = async () => {
-    // Cláusula de Guarda: Validação Front-end
     const emailValido = !!email.trim();
     const senhaValida = !!senha.trim();
 
@@ -59,41 +46,27 @@ export default function Login() {
     setEmailErro("");
     setSenhaErro("");
 
-    // Payload (Carga de dados) que será enviada ao Back-end
-    const credenciais = {
-      email: email,
-      senha: senha,
-    };
+    const credenciais = { email, senha };
 
     try {
-      // Fazendo a chamada HTTP POST para o Spring Boot
-      const resposta = await fetch(
-        `${API_URL}/api/usuarios/login`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(credenciais),
-        },
-      );
+      const resposta = await fetch(`${API_URL}/api/usuarios/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(credenciais),
+      });
 
-      // Verificando o Código de Status HTTP (200 OK)
       if (resposta.ok) {
-        // 🟢 AQUI ESTÁ A MÁGICA NOVA:
-        // Lemos o "corpo" da resposta do Java e transformamos em um objeto JavaScript
         const dadosDoUsuario = await resposta.json();
 
-        // Salvamos o ID do banco de dados e o Perfil escolhido na memória do celular
-        // Nota: O AsyncStorage só aceita textos (strings), por isso convertemos o ID.
-        await AsyncStorage.setItem(
-          "@orienta_usuario_id",
-          dadosDoUsuario.id.toString(),
-        );
-        await AsyncStorage.setItem("@orienta_perfil", perfil);
+        // 🟢 A MÁGICA ACONTECE AQUI:
+        // Em vez de usar o AsyncStorage solto, chamamos o Contexto.
+        // Ele salva no disco E na memória RAM ao mesmo tempo!
+        if (loginGlobal) {
+          await loginGlobal(dadosDoUsuario.id.toString(), perfil);
+        }
 
-        // Destrói a tela de login do histórico e abre as abas internas do app
         roteador.replace("/(tabs)");
       } else {
-        // Tratamento de Erro de Autenticação (Ex: 401 Unauthorized)
         let bodyError = "";
         try {
           const json = await resposta.json();
@@ -105,33 +78,23 @@ export default function Login() {
         setModalErroVisivel(true);
       }
     } catch (error) {
-      // Tratamento de Erro de Rede (Servidor desligado, sem internet, IP errado, etc.)
       Alert.alert("Erro de Conexão", "Não foi possível conectar ao servidor.");
       console.error("Erro no login: ", error);
     }
   };
 
-  // ==========================================
-  // 3. RENDERIZAÇÃO DA INTERFACE (JSX)
-  // ==========================================
   return (
-    // SafeAreaView: Garante que o app não fique escondido sob a câmera ou barra de bateria
     <SafeAreaView style={estilos.recipientePrincipal}>
-      {/* Container Central (Flex 1 empurra o rodapé para baixo) */}
       <View style={estilos.areaCentral}>
-        {/* Cartão de Login */}
         <View style={estilos.cartao}>
-          {/* Cabeçalho do Cartão (Azul) */}
           <View style={estilos.cabecalhoCartao}>
             <Text style={estilos.textoBemVindo}>Bem-vindo!</Text>
             <Text style={estilos.subtitulo}>Acesse sua conta</Text>
           </View>
 
-          {/* Corpo do Formulário (Branco) */}
           <View style={estilos.formulario}>
             <Text style={estilos.rotuloEntrada}>Como você deseja entrar?</Text>
 
-            {/* Alternador de Perfil (Context Switcher) */}
             <View style={estilos.recipienteAlternador}>
               <TouchableOpacity
                 style={[
@@ -176,7 +139,6 @@ export default function Login() {
               </TouchableOpacity>
             </View>
 
-            {/* Inputs Controlados */}
             <Text style={estilos.rotuloEntrada}>Email</Text>
             <InputCustomizado
               placeholder="Digite seu email"
@@ -186,8 +148,9 @@ export default function Login() {
                 if (texto.trim()) setEmailErro("");
               }}
             />
-            
-            {emailErro ? <Text style={estilos.textoErro}>{emailErro}</Text> : null}
+            {emailErro ? (
+              <Text style={estilos.textoErro}>{emailErro}</Text>
+            ) : null}
 
             <Text style={estilos.rotuloEntrada}>Senha</Text>
             <InputCustomizado
@@ -197,22 +160,20 @@ export default function Login() {
                 definirSenha(texto);
                 if (texto.trim()) setSenhaErro("");
               }}
-              seguro={true} // Esconde os caracteres da senha
+              seguro={true}
               mostrarSenha={mostrarSenha}
               aoAlternarSenha={() => setMostrarSenha((anterior) => !anterior)}
             />
+            {senhaErro ? (
+              <Text style={estilos.textoErro}>{senhaErro}</Text>
+            ) : null}
 
-            {senhaErro ? <Text style={estilos.textoErro}>{senhaErro}</Text> : null}
-
-            {/* Botão de Ação Principal */}
             <BotaoCustomizado text="Entrar" aoClicar={executarLogin} />
           </View>
         </View>
       </View>
 
-      {/* Rodapé Fixo */}
       <View style={estilos.rodape}>
-        {/* Linha Divisória */}
         <View style={estilos.recipienteDivisor}>
           <View style={estilos.linhaDivisora} />
           <View style={estilos.textoOu}>
@@ -221,7 +182,6 @@ export default function Login() {
           <View style={estilos.linhaDivisora} />
         </View>
 
-        {/* Botões Sociais (Mock) */}
         <View style={estilos.recipienteSocial}>
           <TouchableOpacity style={estilos.iconeSocial}>
             <FontAwesome name="google" size={24} color="#DB4437" />
@@ -231,7 +191,6 @@ export default function Login() {
           </TouchableOpacity>
         </View>
 
-        {/* Link de Navegação para Cadastro */}
         <View style={estilos.recipienteLinkCadastro}>
           <Text style={estilos.textoFixoRodape}>Não tem conta? </Text>
           <Text
@@ -242,6 +201,7 @@ export default function Login() {
           </Text>
         </View>
       </View>
+
       <Modal transparent visible={modalErroVisivel} animationType="fade">
         <View style={estilos.modalOverlay}>
           <View style={estilos.modalCard}>
@@ -255,14 +215,12 @@ export default function Login() {
             </TouchableOpacity>
           </View>
         </View>
-        </Modal>
+      </Modal>
     </SafeAreaView>
   );
 }
 
-// ==========================================
-// 4. DICIONÁRIO DE ESTILOS (StyleSheet)
-// ==========================================
+// ... (Mantenha o bloco de estilos exatamente como já estava no seu código original)
 const estilos = StyleSheet.create({
   areaCentral: {
     alignItems: "center",
@@ -344,7 +302,6 @@ const estilos = StyleSheet.create({
   textoBemVindo: { color: "white", fontSize: 28, fontWeight: "bold" },
   textoFixoRodape: { color: Colors.text },
   textoOu: { marginHorizontal: 15 },
-  
   modalOverlay: {
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.25)",
@@ -382,15 +339,6 @@ const estilos = StyleSheet.create({
     paddingHorizontal: 20,
     alignItems: "center",
   },
-  modalBotaoTexto: {
-    color: "white",
-    fontWeight: "bold",
-  },
-
-  textoErro: {
-    color: "#CC4444",
-    fontSize: 13,
-    marginTop: 4,
-    marginBottom: 10,
-  },
+  modalBotaoTexto: { color: "white", fontWeight: "bold" },
+  textoErro: { color: "#CC4444", fontSize: 13, marginTop: 4, marginBottom: 10 },
 });

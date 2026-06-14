@@ -6,17 +6,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -40,7 +40,13 @@ export default function PerfilPeca1() {
   const [carregando, setCarregando] = useState(true);
 
   // 🟢 2. ESTADO DO CHAVEADOR AGORA VEM DO CONTEXTO GLOBAL
-  const { perfilAtivo, alternarPerfilGlobal, usuarioId, carregandoAuth } = useAuth() as any;
+  const {
+    perfilAtivo,
+    alternarPerfilGlobal,
+    usuarioId,
+    carregandoAuth,
+    logoutGlobal,
+  } = useAuth() as any;
 
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
@@ -89,7 +95,9 @@ export default function PerfilPeca1() {
 
     const inicializarPerfil = async () => {
       try {
-        const resposta = await fetch(`${URL_BACKEND}/api/usuarios/${usuarioId}`);
+        const resposta = await fetch(
+          `${URL_BACKEND}/api/usuarios/${usuarioId}`,
+        );
         if (resposta.ok) {
           const dadosUsuario = await resposta.json();
           setNome(dadosUsuario.nome || "");
@@ -135,10 +143,15 @@ export default function PerfilPeca1() {
 
   const handleLogout = async () => {
     try {
-      await AsyncStorage.multiRemove([
-        "@orienta_perfil",
-        "@orienta_usuario_id",
-      ]);
+      // 🟢 Limpa a Memória RAM e o Disco Rígido com apenas um comando!
+      if (logoutGlobal) {
+        await logoutGlobal();
+      } else {
+        await AsyncStorage.multiRemove([
+          "@orienta_perfil",
+          "@orienta_usuario_id",
+        ]);
+      }
     } catch (error) {
       console.error("Erro ao limpar storage:", error);
     } finally {

@@ -1,8 +1,8 @@
 import BotaoRapido from "@/components/BotaoRapido";
 import ResumoProfessor from "@/components/ResumoProfessor";
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -15,7 +15,7 @@ import {
 import BannerCallToAction from "../../components/BannerCallToAction";
 import BarraBusca from "../../components/BarraBusca";
 import CabecalhoBoasVindas from "../../components/CabecalhoBoasVindas";
-import CardProfessor from "../../components/CardProfessor"; // 🟢 NOVO COMPONENTE IMPORTADO
+import CardProfessor from "../../components/CardProfessor";
 import SectionTitle from "../../components/SectionTitle";
 import { API_URL } from "../../config/api";
 import { useAuth } from "../../context/AuthContext";
@@ -45,40 +45,43 @@ export default function Index() {
 // 2. TELA DO ALUNO (INTEGRADA COM BANCO REAL)
 // ==========================================
 function HomeAluno({ nome }: { nome: string }) {
-  const { usuarioId } = useAuth(); // 🟢 Puxa o ID do aluno logado
+  const { usuarioId } = useAuth();
   const [categorias, setCategorias] = useState<any[]>([]);
   const [professoresDestaque, setProfessoresDestaque] = useState<any[]>([]);
   const [carregandoProfessores, setCarregandoProfessores] = useState(false);
 
-  useEffect(() => {
-    const buscarDadosAluno = async () => {
-      try {
-        // 1. Busca Categorias
-        const resSaberes = await fetch(`${API_URL}/api/saberes`);
-        if (resSaberes.ok) {
-          const dadosSaberes = await resSaberes.json();
-          setCategorias(dadosSaberes);
-        }
+  const buscarDadosAluno = useCallback(async () => {
+    try {
+      // 1. Busca Categorias
+      const resSaberes = await fetch(`${API_URL}/api/saberes`);
+      if (resSaberes.ok) {
+        const dadosSaberes = await resSaberes.json();
+        setCategorias(dadosSaberes);
+      }
 
-        // 2. 🟢 Busca Professores Dinâmicos
-        if (usuarioId) {
-          setCarregandoProfessores(true);
-          const resProfs = await fetch(
-            `${API_URL}/api/usuarios/professores/destaque/${usuarioId}`,
-          );
-          if (resProfs.ok) {
-            const dadosProfs = await resProfs.json();
-            setProfessoresDestaque(dadosProfs);
-          }
-          setCarregandoProfessores(false);
+      // 2. Busca Professores Dinâmicos
+      if (usuarioId) {
+        setCarregandoProfessores(true);
+        const resProfs = await fetch(
+          `${API_URL}/api/usuarios/professores/destaque/${usuarioId}`,
+        );
+        if (resProfs.ok) {
+          const dadosProfs = await resProfs.json();
+          setProfessoresDestaque(dadosProfs);
         }
-      } catch (error) {
-        console.error("Erro ao buscar dados do aluno", error);
         setCarregandoProfessores(false);
       }
-    };
-    buscarDadosAluno();
+    } catch (error) {
+      console.error("Erro ao buscar dados do aluno", error);
+      setCarregandoProfessores(false);
+    }
   }, [usuarioId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      buscarDadosAluno();
+    }, [buscarDadosAluno]),
+  );
 
   return (
     <View style={estilos.telaGeral}>
@@ -87,7 +90,6 @@ function HomeAluno({ nome }: { nome: string }) {
         contentContainerStyle={estilos.conteudoScroll}
         showsVerticalScrollIndicator={false}
       >
-        {/* Cabeçalho Reutilizável (Aluno) */}
         <CabecalhoBoasVindas
           nome={nome}
           fraseInicio="Encontre o professor ideal e "
@@ -96,7 +98,6 @@ function HomeAluno({ nome }: { nome: string }) {
           onNotificationPress={() => console.log("Abrir Notificações")}
         />
 
-        {/* Barra de Pesquisa Reutilizável */}
         <TouchableOpacity
           activeOpacity={1}
           onPress={() => router.push("/busca-professores")}
@@ -111,26 +112,28 @@ function HomeAluno({ nome }: { nome: string }) {
           </View>
         </TouchableOpacity>
 
-        {/* Banner Call to Action (Via Componente) */}
         <BannerCallToAction
           tituloLinha1="Aprenda com quem"
           palavraDestaque="entende do assunto."
           subtitulo="Mentorias personalizadas para te ajudar a chegar mais longe."
           textoBotao="Explorar professores"
           iconeDestaque="school"
-          onPress={() => router.push("/professor/1")}
+          onPress={() => router.push("/busca-professores")}
         />
 
-        {/* Lista de Disciplinas */}
         <SectionTitle
           titulo="Disciplinas disponíveis"
-          onPressLink={() => console.log("Ver todas as matérias")}
+          onPressLink={() => router.push("/busca-professores")}
         />
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {categorias.length > 0 ? (
             categorias.map((item) => (
-              <TouchableOpacity key={item.id} style={estilos.cardCategoria}>
+              <TouchableOpacity
+                key={item.id}
+                style={estilos.cardCategoria}
+                onPress={() => router.push("/busca-professores")}
+              >
                 <Feather name="book-open" size={28} color="#FF6B1A" />
                 <Text style={estilos.textoCategoria} numberOfLines={2}>
                   {item.nome}
@@ -144,7 +147,6 @@ function HomeAluno({ nome }: { nome: string }) {
           )}
         </ScrollView>
 
-        {/* 🟢 LISTA DE PROFESSORES (AGORA ROLANDO PARA BAIXO NO FEED) */}
         <SectionTitle titulo="Professores em destaque" />
 
         <View style={{ width: "100%" }}>
@@ -197,11 +199,10 @@ function HomeAluno({ nome }: { nome: string }) {
 // 3. TELA DO PROFESSOR (DASHBOARD INTEGRADO)
 // ==========================================
 function HomeProfessor({ nome }: { nome: string }) {
-  const { usuarioId } = useAuth(); // 🟢 Puxa o ID do professor logado
+  const { usuarioId } = useAuth();
   const [proximasAulas, setProximasAulas] = useState<any[]>([]);
   const [carregando, setCarregando] = useState(true);
 
-  // 🟢 1. Busca as aulas do professor no banco
   const buscarAulasProfessor = useCallback(async () => {
     if (!usuarioId) return;
     try {
@@ -217,11 +218,12 @@ function HomeProfessor({ nome }: { nome: string }) {
     }
   }, [usuarioId]);
 
-  useEffect(() => {
-    buscarAulasProfessor();
-  }, [buscarAulasProfessor]);
+  useFocusEffect(
+    useCallback(() => {
+      buscarAulasProfessor();
+    }, [buscarAulasProfessor]),
+  );
 
-  // 🟢 2. Função para Aceitar
   const lidarComAceite = async (idAgendamento: number) => {
     try {
       const res = await fetch(
@@ -237,7 +239,6 @@ function HomeProfessor({ nome }: { nome: string }) {
     }
   };
 
-  // 🟢 3. Função para Recusar
   const lidarComRecusa = async (idAgendamento: number) => {
     try {
       const res = await fetch(
@@ -257,7 +258,6 @@ function HomeProfessor({ nome }: { nome: string }) {
     }
   };
 
-  // 🟢 4. Cálculos para os seus Cards de Resumo
   const aulasRealizadas = proximasAulas.filter(
     (a) => a.status === "CONFIRMADO",
   ).length;
@@ -272,7 +272,6 @@ function HomeProfessor({ nome }: { nome: string }) {
         contentContainerStyle={estilos.conteudoScroll}
         showsVerticalScrollIndicator={false}
       >
-        {/* Cabeçalho Reutilizável (Professor) */}
         <CabecalhoBoasVindas
           nome={nome}
           fraseInicio={"Gerencie suas aulas,\ninspire e "}
@@ -280,7 +279,6 @@ function HomeProfessor({ nome }: { nome: string }) {
           onNotificationPress={() => console.log("Abrir Notificações")}
         />
 
-        {/* 🟢 SEU RESUMO AGORA É DINÂMICO */}
         <View style={estilos.cardResumoGeral}>
           <View style={estilos.resumoGeralHeader}>
             <Text style={estilos.resumoGeralTitulo}>Resumo geral</Text>
@@ -318,13 +316,16 @@ function HomeProfessor({ nome }: { nome: string }) {
 
         <Text style={estilos.tituloSecaoRapida}>Acesso rápido</Text>
         <View style={estilos.containerAcessoRapido}>
-          <BotaoRapido icon="calendar" texto="Minha Agenda" />
+          <BotaoRapido
+            icon="calendar"
+            texto="Minha Agenda"
+            onPress={() => router.push("/agenda")}
+          />
           <BotaoRapido icon="users" texto="Alunos" />
           <BotaoRapido icon="message-square" texto="Mentorias" />
           <BotaoRapido icon="dollar-sign" texto="Ganhos" />
         </View>
 
-        {/* Banner Call to Action (Mantido Intacto) */}
         <BannerCallToAction
           tituloLinha1="Defina suas aulas"
           tituloLinha2="como pagas ou"
@@ -332,15 +333,14 @@ function HomeProfessor({ nome }: { nome: string }) {
           subtitulo="Você decide o valor do seu conhecimento."
           textoBotao="Gerenciar aulas"
           iconeDestaque="school"
-          onPress={() => console.log("Navegar para gerenciamento")}
+          onPress={() => router.push("/perfil")}
         />
 
         <SectionTitle
           titulo="Solicitações e Próximas aulas"
-          onPressLink={() => console.log("Ver todas as aulas")}
+          onPressLink={() => router.push("/agenda")}
         />
 
-        {/* 🟢 LISTA DE AULAS INTEGRADA */}
         <View style={estilos.listaAulasContainer}>
           {carregando ? (
             <ActivityIndicator
@@ -354,7 +354,7 @@ function HomeProfessor({ nome }: { nome: string }) {
                 key={aula.id}
                 id={aula.id}
                 nome={aula.aluno?.nome || "Aluno"}
-                materia="Aula particular" // Fallback seguro
+                materia="Aula particular"
                 data={aula.data}
                 hora={aula.hora.substring(0, 5)}
                 status={aula.status}
@@ -375,11 +375,8 @@ function HomeProfessor({ nome }: { nome: string }) {
 }
 
 // ==========================================
-// 4. COMPONENTES LOCAIS MENORES (Outros foram omitidos para focar no AulaProfessor)
+// 4. SUBCOMPONENTES ESPECÍFICOS
 // ==========================================
-
-// ... (Mantenha seus componentes MiniInfo, ResumoProfessor e BotaoRapido exatamente como estão) ...
-
 function AulaProfessor({
   id,
   nome,
@@ -408,46 +405,42 @@ function AulaProfessor({
     <View style={estilos.aulaListaItem}>
       <Image source={{ uri: foto }} style={estilos.aulaListaFoto} />
 
-      <View style={{ flex: 1, paddingRight: 10 }}>
+      <View style={{ flex: 1, paddingRight: 8 }}>
         <Text style={estilos.aulaListaNome}>{nome}</Text>
         <Text style={estilos.aulaListaMateria}>{materia}</Text>
         <Text style={estilos.aulaListaData}>
           📅 {data} • {hora}
         </Text>
 
-        {/* 🟢 SE ESTIVER PENDENTE, MOSTRA OS BOTÕES */}
+        {/* 🟢 REESTRUTURAÇÃO PREMIUM DOS BOTÕES DE AÇÃO */}
         {pendente && (
-          <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+          <View style={estilos.containerAcoesRacionais}>
             <TouchableOpacity
-              style={{
-                backgroundColor: "#008A46",
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                borderRadius: 8,
-                flex: 1,
-                alignItems: "center",
-              }}
+              style={estilos.botaoAcaoAceitar}
+              activeOpacity={0.7}
               onPress={() => onAceitar(id)}
             >
-              <Text style={{ color: "#FFF", fontSize: 12, fontWeight: "bold" }}>
-                Aceitar
-              </Text>
+              <Feather
+                name="check"
+                size={14}
+                color="#FFF"
+                style={{ marginRight: 4 }}
+              />
+              <Text style={estilos.textoBotaoAcao}>Aceitar</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={{
-                backgroundColor: "#D93838",
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                borderRadius: 8,
-                flex: 1,
-                alignItems: "center",
-              }}
+              style={estilos.botaoAcaoRecusar}
+              activeOpacity={0.7}
               onPress={() => onRecusar(id)}
             >
-              <Text style={{ color: "#FFF", fontSize: 12, fontWeight: "bold" }}>
-                Recusar
-              </Text>
+              <Feather
+                name="x"
+                size={14}
+                color="#FFF"
+                style={{ marginRight: 4 }}
+              />
+              <Text style={estilos.textoBotaoAcao}>Recusar</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -475,14 +468,13 @@ function AulaProfessor({
         </Text>
       </View>
 
-      {/* Esconde a setinha se estiver pendente, para não poluir com os botões */}
       {!pendente && <Feather name="chevron-right" size={20} color="#999" />}
     </View>
   );
 }
 
 // ==========================================
-// 5. DICIONÁRIO DE ESTILOS LIMPO (STYLESHEET)
+// 5. DICIONÁRIO DE ESTILOS (STYLESHEET)
 // ==========================================
 const estilos = StyleSheet.create({
   telaCarregamento: {
@@ -501,7 +493,6 @@ const estilos = StyleSheet.create({
     textAlign: "center",
   },
 
-  // Disciplinas
   cardCategoria: {
     width: 105,
     height: 100,
@@ -520,25 +511,6 @@ const estilos = StyleSheet.create({
     textAlign: "center",
   },
 
-  // Mini Infos Inferiores
-  containerMiniInfos: {
-    marginTop: 28,
-    borderWidth: 1,
-    borderColor: "#EEE",
-    borderRadius: 18,
-    padding: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  miniInfoContainer: { width: "24%", alignItems: "center" },
-  miniInfoTexto: {
-    fontWeight: "bold",
-    textAlign: "center",
-    marginTop: 6,
-    fontSize: 12,
-  },
-
-  // Dashboard Professor
   cardResumoGeral: {
     marginTop: 22,
     borderWidth: 1,
@@ -565,14 +537,6 @@ const estilos = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "space-between",
   },
-  metricaCard: {
-    width: "48%",
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
-  },
-  metricaTitulo: { fontSize: 12, fontWeight: "bold", marginTop: 10 },
-  metricaValor: { fontSize: 26, fontWeight: "bold", marginTop: 6 },
 
   tituloSecaoRapida: {
     fontSize: 18,
@@ -583,21 +547,7 @@ const estilos = StyleSheet.create({
   containerAcessoRapido: {
     flexDirection: "row",
     justifyContent: "space-between",
-  },
-  botaoRapidoCard: {
-    width: "23%",
-    height: 78,
-    borderWidth: 1,
-    borderColor: "#EEE",
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  botaoRapidoTexto: {
-    fontSize: 11,
-    fontWeight: "bold",
-    marginTop: 8,
-    textAlign: "center",
+    marginBottom: 20,
   },
 
   listaAulasContainer: {
@@ -606,6 +556,7 @@ const estilos = StyleSheet.create({
     borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "#FFF",
+    marginTop: 10,
   },
   aulaListaItem: {
     padding: 14,
@@ -615,14 +566,58 @@ const estilos = StyleSheet.create({
     borderBottomColor: "#EEE",
   },
   aulaListaFoto: { width: 48, height: 48, borderRadius: 24, marginRight: 12 },
-  aulaListaNome: { fontWeight: "bold" },
-  aulaListaMateria: { color: "#555", fontSize: 12 },
-  aulaListaData: { color: "#777", fontSize: 12, marginTop: 4 },
+  aulaListaNome: { fontWeight: "bold", fontSize: 15, color: "#111" },
+  aulaListaMateria: { color: "#666", fontSize: 12, marginTop: 2 },
+  aulaListaData: { color: "#888", fontSize: 12, marginTop: 4 },
   aulaTagStatus: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
-    marginRight: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  aulaTagTexto: { fontSize: 11 },
+  aulaTagTexto: { fontSize: 11, fontWeight: "bold" },
+
+  // Estilos específicos para os novos botões táteis do Professor
+  containerAcoesRacionais: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+    width: "100%",
+  },
+  botaoAcaoAceitar: {
+    flexDirection: "row",
+    backgroundColor: "#008A46",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+  },
+  botaoAcaoRecusar: {
+    flexDirection: "row",
+    backgroundColor: "#D93838",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+  },
+  textoBotaoAcao: {
+    color: "#FFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
 });

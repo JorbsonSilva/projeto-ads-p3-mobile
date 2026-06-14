@@ -9,6 +9,8 @@ interface AuthContextData {
   nomeUsuario: string;
   carregandoAuth: boolean;
   alternarPerfilGlobal: (novoPerfil: string) => Promise<void>;
+  loginGlobal: (id: string, perfil: string) => Promise<void>;
+  logoutGlobal: () => Promise<void>;
   atualizarNomeGlobal: (novoNome: string) => void;
   deslogarGlobal: () => Promise<void>;
   atualizarSessao: () => Promise<void>;
@@ -56,6 +58,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem("@orienta_perfil", novoPerfil);
   };
 
+  // 🟢 1. Função que o Login vai chamar
+  const loginGlobal = async (id: string, perfil: string) => {
+    setUsuarioId(id); // Atualiza a memória na hora!
+    setPerfilAtivo(perfil);
+    // Busca o nome do usuário no backend ao realizar login
+    try {
+      const resposta = await fetch(`${API_URL}/api/usuarios/${id}`);
+      if (resposta.ok) {
+        const dados = await resposta.json();
+        const primeiroNome = dados.nome ? dados.nome.split(" ")[0] : "Usuário";
+        setNomeUsuario(primeiroNome);
+      } else {
+        setNomeUsuario("");
+      }
+    } catch (error) {
+      console.error("Erro ao obter nome no loginGlobal:", error);
+      setNomeUsuario("");
+    }
+    await AsyncStorage.setItem("@orienta_usuario_id", id);
+    await AsyncStorage.setItem("@orienta_perfil", perfil);
+  };
+
+  // 🟢 2. Função que o Logout vai chamar
+  const logoutGlobal = async () => {
+    setUsuarioId(null); // Limpa a memória na hora!
+    setPerfilAtivo("Aluno");
+    setNomeUsuario("");
+    await AsyncStorage.multiRemove(["@orienta_usuario_id", "@orienta_perfil"]);
+  };
+
   const atualizarNomeGlobal = (novoNome: string) => {
     const primeiroNome = novoNome.split(" ")[0];
     setNomeUsuario(primeiroNome);
@@ -76,6 +108,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         nomeUsuario,
         carregandoAuth,
         alternarPerfilGlobal,
+        loginGlobal,
+        logoutGlobal,
         atualizarNomeGlobal,
         deslogarGlobal,
         atualizarSessao: carregarSessaoDoBanco,
